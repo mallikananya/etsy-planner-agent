@@ -1,0 +1,47 @@
+{
+  "id": "daily_reset",
+  "page_type": "daily_planner",
+  "title": "Daily Reset",
+  "subtitle": "A simple page for focus, care, and completion.",
+  "metadata": {
+    "collection": "wellness_starter"
+  },
+  "sections": [
+    {
+      "id": "today_focus",
+      "type": "checkbox_list",
+      "title": "Today",
+      "weight": 1.0,
+      "fields": {
+        "items": ["Main focus", "One thing to finish", "One thing to let go"]
+      }
+    },
+    {
+      "id": "schedule",
+      "type": "writing_lines",
+      "title": "Schedule",
+      "weight": 1.4,
+      "fields": {
+        "count": 8
+      }
+    },
+    {
+      "id": "self_care",
+      "type": "checkbox_list",
+      "title": "Self Care",
+      "weight": 0.9,
+      "fields": {
+        "items": ["Water", "Movement", "Mindful pause", "Nourishing meal"]
+      }
+    },
+    {
+      "id": "notes",
+      "type": "notes_box",
+      "title": "Notes",
+      "weight": 1.0,
+      "fields": {
+        "line_count": 5
+      }
+    }
+  ]
+}

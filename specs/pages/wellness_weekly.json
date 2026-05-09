@@ -1,0 +1,50 @@
+{
+  "id": "wellness_weekly",
+  "page_type": "weekly_planner",
+  "title": "Weekly Wellness Planner",
+  "subtitle": "A calm weekly reset for priorities, habits, meals, movement, and reflection.",
+  "metadata": {
+    "collection": "wellness_starter"
+  },
+  "sections": [
+    {
+      "id": "priorities",
+      "type": "checkbox_list",
+      "title": "Top Priorities",
+      "weight": 1.1,
+      "fields": {
+        "count": 5
+      }
+    },
+    {
+      "id": "habits",
+      "type": "tracker_grid",
+      "title": "Habit Tracker",
+      "weight": 1.3,
+      "fields": {
+        "rows": 5,
+        "columns": 7
+      }
+    },
+    {
+      "id": "meals_movement",
+      "type": "two_column",
+      "title": "Meals + Movement",
+      "weight": 1.2,
+      "fields": {
+        "left_title": "Meal Plan",
+        "right_title": "Movement",
+        "line_count": 6
+      }
+    },
+    {
+      "id": "reflection",
+      "type": "notes_box",
+      "title": "Weekly Reflection",
+      "weight": 1.0,
+      "fields": {
+        "line_count": 5
+      }
+    }
+  ]
+}

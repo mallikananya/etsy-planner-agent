@@ -1,0 +1,25 @@
+{
+  "id": "wellness_starter",
+  "name": "Wellness Starter Printable Planner",
+  "description": "A cohesive printable planner bundle for gentle weekly planning, daily resets, wellness tracking, and notes.",
+  "paper_sizes": ["letter", "a4"],
+  "metadata": {
+    "seo_title": "Wellness Planner Printable, Daily Weekly Planner PDF, Habit Tracker, Self Care Planner, Instant Download",
+    "included_pages": ["Weekly wellness planner", "Daily reset planner", "Lined notes page"],
+    "tags": ["wellness planner", "habit tracker", "self care planner", "daily planner", "weekly planner", "planner pdf"]
+  },
+  "pages": [
+    {
+      "page": "../pages/wellness_weekly.json",
+      "repeat": 1
+    },
+    {
+      "page": "../pages/daily_reset.json",
+      "repeat": 1
+    },
+    {
+      "page": "../pages/notes_lined.json",
+      "repeat": 1
+    }
+  ]
+}

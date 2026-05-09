@@ -1,0 +1,54 @@
+from __future__ import annotations
+
+import argparse
+from pathlib import Path
+
+from planner_generator.exports.bundle_exporter import export_bundle
+from planner_generator.rendering.page_renderer import render_page_to_pdf
+from planner_generator.planner_specs.loader import load_page_spec
+from planner_generator.theme_engine.loader import load_theme
+from planner_generator.utils.env import load_dotenv
+
+
+def main() -> None:
+    load_dotenv()
+    parser = argparse.ArgumentParser(prog="planner-generator")
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    page_parser = subparsers.add_parser("build-page", help="Render a single page PDF.")
+    page_parser.add_argument("--page", required=True, help="Path to a page spec JSON file.")
+    page_parser.add_argument("--theme", required=True, help="Path to a theme JSON file.")
+    page_parser.add_argument("--size", default="letter", choices=["letter", "a4"])
+    page_parser.add_argument("--output", required=True, help="Output PDF path.")
+
+    bundle_parser = subparsers.add_parser("build-bundle", help="Render a planner bundle.")
+    bundle_parser.add_argument("--bundle", required=True, help="Path to a bundle spec JSON file.")
+    bundle_parser.add_argument("--theme", required=True, help="Path to a theme JSON file.")
+    bundle_parser.add_argument("--output", default="output", help="Output root directory.")
+
+    listing_parser = subparsers.add_parser("generate-listing-assets", help="Generate listing assets through the bundle export pipeline.")
+    listing_parser.add_argument("--bundle", required=True)
+    listing_parser.add_argument("--theme", required=True)
+    listing_parser.add_argument("--output", default="output")
+
+    etsy_parser = subparsers.add_parser("prepare-etsy-draft", help="Reserved command for future Etsy draft creation.")
+    etsy_parser.add_argument("--manifest", required=True)
+
+    args = parser.parse_args()
+
+    if args.command == "build-page":
+        page = load_page_spec(args.page)
+        theme = load_theme(args.theme)
+        render_page_to_pdf(page, theme, args.size, args.output)
+        print(f"Wrote {Path(args.output)}")
+    elif args.command in {"build-bundle", "generate-listing-assets"}:
+        theme = load_theme(args.theme)
+        result = export_bundle(args.bundle, theme, args.output)
+        print(f"Wrote bundle output to {result.output_dir}")
+        print(f"Manifest: {result.manifest_path}")
+    elif args.command == "prepare-etsy-draft":
+        raise SystemExit("Etsy draft creation is planned for a later phase and will never auto-publish.")
+
+
+if __name__ == "__main__":
+    main()

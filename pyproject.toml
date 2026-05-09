@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "etsy-planner-agent"
+version = "0.1.0"
+description = "Local-first deterministic pipeline for Etsy printable planner products."
+readme = "README.md"
+requires-python = ">=3.9"
+authors = [{ name = "Etsy Planner Agent" }]
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[project.scripts]
+planner-generator = "planner_generator.cli.main:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]

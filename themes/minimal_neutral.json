@@ -1,0 +1,28 @@
+{
+  "id": "minimal_neutral",
+  "name": "Minimal Neutral",
+  "colors": {
+    "background": "#FFFFFF",
+    "heading": "#2F2A25",
+    "body": "#3D3934",
+    "muted": "#8A8178",
+    "accent": "#9A7B64",
+    "divider": "#D8D1C8",
+    "line": "#CDC6BE"
+  },
+  "typography": {
+    "title_size": "25",
+    "subtitle_size": "10",
+    "section_title_size": "9",
+    "body_size": "9"
+  },
+  "spacing": {
+    "page_margin": 54,
+    "header_height": 82,
+    "section_gap": 18
+  },
+  "strokes": {
+    "divider": 0.5,
+    "line": 0.3
+  }
+}
