@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
+from planner_generator.bundle_builder.batch import build_all
 from planner_generator.exports.bundle_exporter import export_bundle
 from planner_generator.etsy_integration.client import EtsyDraftClient
 from planner_generator.rendering.page_renderer import render_page_to_pdf
@@ -32,6 +33,11 @@ def main() -> None:
     listing_parser.add_argument("--theme", required=True)
     listing_parser.add_argument("--output", default="output")
 
+    batch_parser = subparsers.add_parser("build-all", help="Render every bundle/theme combination.")
+    batch_parser.add_argument("--bundles", default="specs/bundles", help="Directory containing bundle spec JSON files.")
+    batch_parser.add_argument("--themes", default="themes", help="Directory containing theme JSON files.")
+    batch_parser.add_argument("--output", default="output/batch", help="Batch output directory.")
+
     etsy_parser = subparsers.add_parser("prepare-etsy-draft", help="Reserved command for future Etsy draft creation.")
     etsy_parser.add_argument("--manifest", required=True)
     etsy_parser.add_argument("--output", default=None, help="Directory for the draft payload JSON.")
@@ -48,6 +54,10 @@ def main() -> None:
         result = export_bundle(args.bundle, theme, args.output)
         print(f"Wrote bundle output to {result.output_dir}")
         print(f"Manifest: {result.manifest_path}")
+    elif args.command == "build-all":
+        result = build_all(args.bundles, args.themes, args.output)
+        print(f"Wrote {len(result.items)} bundle/theme builds to {result.output_dir}")
+        print(f"Batch manifest: {result.manifest_path}")
     elif args.command == "prepare-etsy-draft":
         output_dir = args.output or str(Path(args.manifest).parent / "listing")
         result = EtsyDraftClient().create_draft_plan(args.manifest, output_dir)

@@ -71,6 +71,17 @@ The ZIP exists because Etsy digital products often need a tidy customer download
 python -m pytest
 ```
 
+## Batch Build
+
+```bash
+python -m planner_generator.cli.main build-all \
+  --bundles specs/bundles \
+  --themes themes \
+  --output output/batch
+```
+
+This renders every bundle/theme combination and writes `batch_manifest.json` in the batch output folder.
+
 ## Prepare An Etsy Draft Payload
 
 ```bash
