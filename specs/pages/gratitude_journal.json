@@ -1,0 +1,41 @@
+{
+  "id": "gratitude_journal",
+  "page_type": "gratitude_page",
+  "title": "Gratitude Journal",
+  "subtitle": "Capture what felt good, what supported you, and what you want to remember.",
+  "metadata": {
+    "collection": "component_expansion",
+    "collection_label": "planner component library"
+  },
+  "sections": [
+    {
+      "id": "daily_gratitude",
+      "type": "writing_lines",
+      "title": "Today I Am Grateful For",
+      "weight": 1.0,
+      "fields": {
+        "count": 6
+      }
+    },
+    {
+      "id": "small_moments",
+      "type": "quadrant_board",
+      "title": "Small Moments",
+      "weight": 1.4,
+      "fields": {
+        "labels": ["People", "Places", "Wins", "Comforts"],
+        "line_count": 4
+      }
+    },
+    {
+      "id": "keep_close",
+      "type": "prompt_box",
+      "title": "Keep Close",
+      "weight": 0.8,
+      "fields": {
+        "prompt": "One sentence I want to carry forward:",
+        "line_count": 3
+      }
+    }
+  ]
+}

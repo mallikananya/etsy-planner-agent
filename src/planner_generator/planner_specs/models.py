@@ -5,10 +5,13 @@ from typing import Any, Dict, List, Optional
 
 
 SUPPORTED_SECTION_TYPES = {
+    "amount_rows",
+    "calendar_grid",
     "writing_lines",
     "checkbox_list",
     "notes_box",
     "prompt_box",
+    "quadrant_board",
     "rating_scale",
     "tracker_grid",
     "two_column",

@@ -1,0 +1,44 @@
+{
+  "id": "goal_planner",
+  "page_type": "goal_planner",
+  "title": "Goal Planner",
+  "subtitle": "Turn one meaningful goal into milestones, measures, and next actions.",
+  "metadata": {
+    "collection": "component_expansion",
+    "collection_label": "planner component library"
+  },
+  "sections": [
+    {
+      "id": "goal_statement",
+      "type": "prompt_box",
+      "title": "Goal Statement",
+      "weight": 0.8,
+      "fields": {
+        "prompt": "The goal I am choosing:",
+        "line_count": 4
+      }
+    },
+    {
+      "id": "goal_map",
+      "type": "quadrant_board",
+      "title": "Goal Map",
+      "weight": 1.4,
+      "fields": {
+        "labels": ["Why", "Milestones", "Obstacles", "Support"],
+        "line_count": 4
+      }
+    },
+    {
+      "id": "action_plan",
+      "type": "amount_rows",
+      "title": "Action Plan",
+      "weight": 1.1,
+      "fields": {
+        "rows": 6,
+        "label_width": 300,
+        "amount_width": 80,
+        "total_width": 70
+      }
+    }
+  ]
+}

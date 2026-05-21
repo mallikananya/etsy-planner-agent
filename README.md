@@ -34,6 +34,15 @@ python -m planner_generator.cli.main build-bundle \
   --output output
 ```
 
+Another compact bundle exercises the expanded reusable component library:
+
+```bash
+python -m planner_generator.cli.main build-bundle \
+  --bundle specs/bundles/component_showcase.json \
+  --theme themes/muted_luxury.json \
+  --output output
+```
+
 Available starter themes:
 
 ```text

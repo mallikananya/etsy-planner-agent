@@ -120,6 +120,10 @@ def _draw_section(canvas: PdfCanvas, section: LayoutSection, theme: Theme) -> No
 
     if spec.type == "writing_lines":
         _draw_writing_lines(canvas, body, spec, theme)
+    elif spec.type == "amount_rows":
+        _draw_amount_rows(canvas, body, spec, theme)
+    elif spec.type == "calendar_grid":
+        _draw_calendar_grid(canvas, body, spec, theme)
     elif spec.type == "checkbox_list":
         _draw_checkbox_list(canvas, body, spec, theme)
     elif spec.type == "notes_box":
@@ -130,6 +134,8 @@ def _draw_section(canvas: PdfCanvas, section: LayoutSection, theme: Theme) -> No
         _draw_two_column(canvas, body, spec, theme)
     elif spec.type == "prompt_box":
         _draw_prompt_box(canvas, body, spec, theme)
+    elif spec.type == "quadrant_board":
+        _draw_quadrant_board(canvas, body, spec, theme)
     elif spec.type == "rating_scale":
         _draw_rating_scale(canvas, body, spec, theme)
 
@@ -142,6 +148,47 @@ def _draw_writing_lines(canvas: PdfCanvas, bounds: Rect, spec: SectionSpec, them
     for index in range(count):
         y = bounds.top - gap * (index + 1)
         canvas.line(bounds.x, y, bounds.right, y, theme.color("line"), theme.stroke("line", 0.3))
+
+
+def _draw_amount_rows(canvas: PdfCanvas, bounds: Rect, spec: SectionSpec, theme: Theme) -> None:
+    rows = max(1, int(spec.fields.get("rows", 6)))
+    label_width = min(bounds.width * 0.55, float(spec.fields.get("label_width", 240)))
+    amount_width = min(bounds.width * 0.24, float(spec.fields.get("amount_width", 110)))
+    total_width = min(bounds.width * 0.2, float(spec.fields.get("total_width", 90)))
+    row_height = bounds.height / rows
+    header_y = bounds.top - 12
+    canvas.text("ITEM", bounds.x + 6, header_y, 7, theme.color("muted"), font="sans")
+    canvas.text("AMOUNT", bounds.x + label_width + 12, header_y, 7, theme.color("muted"), font="sans")
+    canvas.text("DONE", bounds.right - total_width + 10, header_y, 7, theme.color("muted"), font="sans")
+    for index in range(rows):
+        y = bounds.top - row_height * (index + 1)
+        if index % 2 == 0:
+            canvas.rect(bounds.x, y + 2, bounds.width, max(1, row_height - 3), fill=theme.color("row_fill", "#FFFFFF"))
+        canvas.line(bounds.x, y, bounds.right, y, theme.color("line"), 0.25)
+        canvas.line(bounds.x + label_width, y + 3, bounds.x + label_width, y + row_height - 3, theme.color("divider"), 0.25)
+        canvas.line(bounds.right - total_width, y + 3, bounds.right - total_width, y + row_height - 3, theme.color("divider"), 0.25)
+        canvas.rect(bounds.right - total_width + 12, y + row_height / 2 - 4, 8, 8, stroke=theme.color("accent"), fill=theme.color("checkbox_fill"), stroke_width=0.35)
+
+
+def _draw_calendar_grid(canvas: PdfCanvas, bounds: Rect, spec: SectionSpec, theme: Theme) -> None:
+    weeks = max(4, min(6, int(spec.fields.get("weeks", 6))))
+    weekdays = [str(day) for day in spec.fields.get("weekdays", ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"])]
+    columns = 7
+    header_height = 18.0
+    cell_width = bounds.width / columns
+    cell_height = max(1, (bounds.height - header_height) / weeks)
+    canvas.rect(bounds.x, bounds.y, bounds.width, bounds.height, fill=theme.color("paper_fill", "#FFFFFF"))
+    for column, label in enumerate(weekdays[:columns]):
+        x = bounds.x + column * cell_width
+        canvas.rect(x, bounds.top - header_height, cell_width, header_height, fill=theme.color("label_fill", "#F6E7DF"))
+        canvas.text(label.upper(), x + 5, bounds.top - 12, 7, theme.color("accent"), font="sans")
+    for column in range(columns + 1):
+        x = bounds.x + column * cell_width
+        canvas.line(x, bounds.y, x, bounds.top, theme.color("line"), 0.25)
+    for row in range(weeks + 1):
+        y = bounds.y + row * cell_height
+        canvas.line(bounds.x, y, bounds.right, y, theme.color("line"), 0.25)
+    canvas.line(bounds.x, bounds.top - header_height, bounds.right, bounds.top - header_height, theme.color("divider"), 0.4)
 
 
 def _draw_checkbox_list(canvas: PdfCanvas, bounds: Rect, spec: SectionSpec, theme: Theme) -> None:
@@ -210,6 +257,26 @@ def _draw_prompt_box(canvas: PdfCanvas, bounds: Rect, spec: SectionSpec, theme: 
         canvas.text(prompt, bounds.x + 10, bounds.top - 20, float(theme.typography.get("body_size", 9)), theme.color("heading"), font="sans")
     line_spec = SectionSpec(id=f"{spec.id}_lines", type="writing_lines", title="", fields={"count": spec.fields.get("line_count", 5)})
     _draw_writing_lines(canvas, Rect(bounds.x + 8, bounds.y + 4, bounds.width - 16, max(0, bounds.height - 42)), line_spec, theme)
+
+
+def _draw_quadrant_board(canvas: PdfCanvas, bounds: Rect, spec: SectionSpec, theme: Theme) -> None:
+    labels = [str(label) for label in spec.fields.get("labels", ["Top Left", "Top Right", "Bottom Left", "Bottom Right"])]
+    labels = (labels + ["", "", "", ""])[:4]
+    gap = 12.0
+    column_width = (bounds.width - gap) / 2
+    row_height = (bounds.height - gap) / 2
+    quadrants = [
+        Rect(bounds.x, bounds.y + row_height + gap, column_width, row_height),
+        Rect(bounds.x + column_width + gap, bounds.y + row_height + gap, column_width, row_height),
+        Rect(bounds.x, bounds.y, column_width, row_height),
+        Rect(bounds.x + column_width + gap, bounds.y, column_width, row_height),
+    ]
+    for index, quadrant in enumerate(quadrants):
+        canvas.rect(quadrant.x, quadrant.y, quadrant.width, quadrant.height, fill=theme.color("paper_fill", "#FFFFFF"), stroke=theme.color("divider"), stroke_width=0.35)
+        canvas.rect(quadrant.x, quadrant.top - 18, quadrant.width, 18, fill=theme.color("label_fill", "#F6E7DF"))
+        canvas.text(labels[index].upper(), quadrant.x + 7, quadrant.top - 12, 7, theme.color("accent"), font="sans")
+        line_spec = SectionSpec(id=f"{spec.id}_{index}_lines", type="writing_lines", title="", fields={"count": spec.fields.get("line_count", 4)})
+        _draw_writing_lines(canvas, Rect(quadrant.x + 8, quadrant.y + 8, quadrant.width - 16, quadrant.height - 32), line_spec, theme)
 
 
 def _draw_rating_scale(canvas: PdfCanvas, bounds: Rect, spec: SectionSpec, theme: Theme) -> None:

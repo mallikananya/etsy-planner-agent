@@ -1,0 +1,40 @@
+{
+  "id": "budget_snapshot",
+  "page_type": "budget_planner",
+  "title": "Budget Snapshot",
+  "subtitle": "Track expected spending, actual spending, and small money decisions.",
+  "metadata": {
+    "collection": "component_expansion",
+    "collection_label": "planner component library"
+  },
+  "sections": [
+    {
+      "id": "income_expenses",
+      "type": "amount_rows",
+      "title": "Income + Expenses",
+      "weight": 1.6,
+      "fields": {
+        "rows": 10
+      }
+    },
+    {
+      "id": "money_notes",
+      "type": "prompt_box",
+      "title": "Money Notes",
+      "weight": 1.0,
+      "fields": {
+        "prompt": "What needs attention before the next check-in?",
+        "line_count": 5
+      }
+    },
+    {
+      "id": "sinking_funds",
+      "type": "checkbox_list",
+      "title": "Sinking Funds",
+      "weight": 0.8,
+      "fields": {
+        "items": ["Emergency", "Gifts", "Home", "Health", "Travel"]
+      }
+    }
+  ]
+}

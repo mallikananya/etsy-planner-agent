@@ -27,3 +27,10 @@ def test_load_sample_page_sections():
         "two_column",
         "notes_box",
     ]
+
+
+def test_load_component_showcase_bundle():
+    bundle = load_bundle_spec(ROOT / "specs/bundles/component_showcase.json")
+
+    assert bundle.id == "component_showcase"
+    assert bundle.sequence_repeat == 2

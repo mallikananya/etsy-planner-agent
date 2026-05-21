@@ -1,0 +1,32 @@
+{
+  "id": "monthly_overview",
+  "page_type": "monthly_planner",
+  "title": "Monthly Overview",
+  "subtitle": "Map the month with key dates, focus areas, and gentle priorities.",
+  "metadata": {
+    "collection": "component_expansion",
+    "collection_label": "planner component library"
+  },
+  "sections": [
+    {
+      "id": "calendar",
+      "type": "calendar_grid",
+      "title": "Monthly Calendar",
+      "weight": 2.0,
+      "fields": {
+        "weeks": 6
+      }
+    },
+    {
+      "id": "monthly_focus",
+      "type": "two_column",
+      "title": "Focus + Reminders",
+      "weight": 1.0,
+      "fields": {
+        "left_title": "This Month",
+        "right_title": "Remember",
+        "line_count": 5
+      }
+    }
+  ]
+}

@@ -1,0 +1,35 @@
+{
+  "id": "component_showcase",
+  "name": "Planner Component Showcase",
+  "description": "A compact printable planner bundle exercising reusable monthly, budget, gratitude, brain dump, and goal planning components.",
+  "paper_sizes": ["letter", "a4"],
+  "sequence_repeat": 2,
+  "metadata": {
+    "seo_title": "Printable Planner Component Bundle, Monthly Budget Goals Gratitude Brain Dump PDF",
+    "included_pages": ["Monthly overview", "Budget snapshot", "Gratitude journal", "Brain dump", "Goal planner"],
+    "page_count": 10,
+    "tags": ["printable planner", "goal planner", "budget planner", "gratitude journal", "brain dump", "monthly planner"]
+  },
+  "pages": [
+    {
+      "page": "../pages/monthly_overview.json",
+      "repeat": 1
+    },
+    {
+      "page": "../pages/budget_snapshot.json",
+      "repeat": 1
+    },
+    {
+      "page": "../pages/gratitude_journal.json",
+      "repeat": 1
+    },
+    {
+      "page": "../pages/brain_dump.json",
+      "repeat": 1
+    },
+    {
+      "page": "../pages/goal_planner.json",
+      "repeat": 1
+    }
+  ]
+}

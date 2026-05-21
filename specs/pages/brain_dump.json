@@ -1,0 +1,40 @@
+{
+  "id": "brain_dump",
+  "page_type": "brain_dump",
+  "title": "Brain Dump",
+  "subtitle": "Get the loose thoughts out of your head and into a calm sorting space.",
+  "metadata": {
+    "collection": "component_expansion",
+    "collection_label": "planner component library"
+  },
+  "sections": [
+    {
+      "id": "sort_board",
+      "type": "quadrant_board",
+      "title": "Sort The Noise",
+      "weight": 1.5,
+      "fields": {
+        "labels": ["Do", "Delegate", "Decide", "Release"],
+        "line_count": 5
+      }
+    },
+    {
+      "id": "open_notes",
+      "type": "notes_box",
+      "title": "Open Notes",
+      "weight": 1.2,
+      "fields": {
+        "line_count": 8
+      }
+    },
+    {
+      "id": "next_steps",
+      "type": "checkbox_list",
+      "title": "Next Tiny Steps",
+      "weight": 0.8,
+      "fields": {
+        "count": 5
+      }
+    }
+  ]
+}

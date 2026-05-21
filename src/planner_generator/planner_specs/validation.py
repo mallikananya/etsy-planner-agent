@@ -40,6 +40,16 @@ def _validate_section(section: SectionSpec, page_id: str) -> None:
         columns = int(section.fields.get("columns", 1))
         if rows < 1 or columns < 1:
             raise ValueError(f"Tracker section '{section.id}' on page '{page_id}' must have positive rows and columns.")
+    if section.type == "calendar_grid":
+        weeks = int(section.fields.get("weeks", 6))
+        if weeks < 4 or weeks > 6:
+            raise ValueError(f"Calendar section '{section.id}' on page '{page_id}' must use 4 to 6 weeks.")
+    if section.type == "amount_rows" and int(section.fields.get("rows", 1)) < 1:
+        raise ValueError(f"Amount rows section '{section.id}' on page '{page_id}' must include at least one row.")
+    if section.type == "quadrant_board":
+        labels = section.fields.get("labels", [])
+        if labels and len(labels) != 4:
+            raise ValueError(f"Quadrant board section '{section.id}' on page '{page_id}' must define exactly four labels.")
     if section.type in {"writing_lines", "notes_box", "prompt_box"}:
         count = int(section.fields.get("count", section.fields.get("line_count", 1)))
         if count < 0:
