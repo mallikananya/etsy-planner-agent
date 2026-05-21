@@ -1,0 +1,40 @@
+{
+  "id": "soft_feminine",
+  "name": "Soft Feminine",
+  "colors": {
+    "background": "#FFFDFC",
+    "heading": "#3B3034",
+    "body": "#4A4143",
+    "muted": "#9C8588",
+    "accent": "#C47E88",
+    "divider": "#E8D6D8",
+    "line": "#D9C1C5",
+    "top_band": "#F7E4E8",
+    "side_band": "#F3EDE7",
+    "corner_block": "#E8B5BC",
+    "ornament": "#A46E78",
+    "page_rule": "#E5D3D0",
+    "section_fill": "#FFF9F8",
+    "section_band": "#F8E8EB",
+    "row_fill": "#FFF4F6",
+    "checkbox_fill": "#FFF8F8",
+    "paper_fill": "#FFFFFF",
+    "label_fill": "#F4DADF",
+    "prompt_fill": "#F8E6DF"
+  },
+  "typography": {
+    "title_size": "27",
+    "subtitle_size": "10",
+    "section_title_size": "9",
+    "body_size": "9"
+  },
+  "spacing": {
+    "page_margin": 52,
+    "header_height": 84,
+    "section_gap": 14
+  },
+  "strokes": {
+    "divider": 0.5,
+    "line": 0.3
+  }
+}

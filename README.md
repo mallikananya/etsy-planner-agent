@@ -34,6 +34,15 @@ python -m planner_generator.cli.main build-bundle \
   --output output
 ```
 
+Available starter themes:
+
+```text
+themes/minimal_neutral.json
+themes/soft_feminine.json
+themes/muted_luxury.json
+themes/academic_pastel.json
+```
+
 The sample writes complete joined customer PDFs, individual page PDFs, a ZIP package, PNG previews, a manifest, and starter listing metadata under:
 
 ```text

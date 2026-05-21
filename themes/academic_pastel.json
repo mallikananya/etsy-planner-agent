@@ -1,0 +1,40 @@
+{
+  "id": "academic_pastel",
+  "name": "Academic Pastel",
+  "colors": {
+    "background": "#FCFEFF",
+    "heading": "#263347",
+    "body": "#394153",
+    "muted": "#6E7D96",
+    "accent": "#6C85B8",
+    "divider": "#D2DBEA",
+    "line": "#B9C7DE",
+    "top_band": "#DEEAF7",
+    "side_band": "#E9F4EE",
+    "corner_block": "#F1C9A9",
+    "ornament": "#5B719A",
+    "page_rule": "#CDD9E9",
+    "section_fill": "#FDFEFF",
+    "section_band": "#E7F0FA",
+    "row_fill": "#F4F9FF",
+    "checkbox_fill": "#FDFEFF",
+    "paper_fill": "#FFFFFF",
+    "label_fill": "#E4EDF8",
+    "prompt_fill": "#F6E6D8"
+  },
+  "typography": {
+    "title_size": "26",
+    "subtitle_size": "10",
+    "section_title_size": "9",
+    "body_size": "9"
+  },
+  "spacing": {
+    "page_margin": 50,
+    "header_height": 82,
+    "section_gap": 13
+  },
+  "strokes": {
+    "divider": 0.5,
+    "line": 0.3
+  }
+}

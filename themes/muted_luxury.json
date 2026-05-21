@@ -1,0 +1,40 @@
+{
+  "id": "muted_luxury",
+  "name": "Muted Luxury",
+  "colors": {
+    "background": "#FCFBF7",
+    "heading": "#252525",
+    "body": "#3B3934",
+    "muted": "#777066",
+    "accent": "#9B7A3B",
+    "divider": "#D8D0BF",
+    "line": "#C6BDAA",
+    "top_band": "#EDE5D2",
+    "side_band": "#E7E2D7",
+    "corner_block": "#CDB77E",
+    "ornament": "#75652F",
+    "page_rule": "#D4C8AF",
+    "section_fill": "#FFFDF8",
+    "section_band": "#F0E8D6",
+    "row_fill": "#F8F5EC",
+    "checkbox_fill": "#FFFDF8",
+    "paper_fill": "#FFFFFF",
+    "label_fill": "#E9DFC7",
+    "prompt_fill": "#F2EBDD"
+  },
+  "typography": {
+    "title_size": "28",
+    "subtitle_size": "10",
+    "section_title_size": "9",
+    "body_size": "9"
+  },
+  "spacing": {
+    "page_margin": 54,
+    "header_height": 86,
+    "section_gap": 14
+  },
+  "strokes": {
+    "divider": 0.45,
+    "line": 0.28
+  }
+}

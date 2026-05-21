@@ -26,7 +26,7 @@ Non-goals:
 
 ## Phase 2: Export Quality
 
-Status: in progress.
+Status: complete.
 
 Goals:
 
@@ -37,6 +37,8 @@ Goals:
 - Improve print-safe dimensions, margins, and page numbering.
 
 ## Phase 3: Product System Expansion
+
+Status: in progress.
 
 Goals:
 
