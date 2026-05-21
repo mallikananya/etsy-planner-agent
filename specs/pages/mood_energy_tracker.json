@@ -1,0 +1,42 @@
+{
+  "id": "mood_energy_tracker",
+  "page_type": "tracker",
+  "title": "Mood + Energy Tracker",
+  "subtitle": "Notice patterns across the week with a gentle visual check-in.",
+  "metadata": {
+    "collection": "wellness_starter",
+    "collection_label": "six-week wellness system"
+  },
+  "sections": [
+    {
+      "id": "ratings",
+      "type": "rating_scale",
+      "title": "Daily Ratings",
+      "weight": 1.1,
+      "fields": {
+        "labels": ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+        "steps": 5
+      }
+    },
+    {
+      "id": "tracker",
+      "type": "tracker_grid",
+      "title": "Patterns",
+      "weight": 1.4,
+      "fields": {
+        "rows": 6,
+        "columns": 7
+      }
+    },
+    {
+      "id": "notes",
+      "type": "prompt_box",
+      "title": "What Helped?",
+      "weight": 1.0,
+      "fields": {
+        "prompt": "Which choices made the week feel lighter?",
+        "line_count": 5
+      }
+    }
+  ]
+}

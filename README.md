@@ -2,6 +2,8 @@
 
 Etsy Planner Agent is a local-first generation pipeline for deterministic, printable Etsy planner products. The first phase focuses on clean architecture, reusable specs, reusable themes, and export foundations.
 
+See [docs/PRD.md](docs/PRD.md) for the product requirements and [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md) for the phased build plan.
+
 ## Current Scope
 
 - Declarative bundle and page specs
@@ -16,6 +18,7 @@ Etsy Planner Agent is a local-first generation pipeline for deterministic, print
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
+python -m pip install --upgrade pip setuptools wheel
 python -m pip install -e ".[dev]"
 cp .env.example .env
 ```
@@ -31,17 +34,28 @@ python -m planner_generator.cli.main build-bundle \
   --output output
 ```
 
-The sample writes customer PDFs, a manifest, and starter listing metadata under:
+The sample writes complete joined customer PDFs, individual page PDFs, a ZIP package, preview SVGs, a manifest, and starter listing metadata under:
 
 ```text
 output/wellness_starter/
 ```
+
+The ZIP exists because Etsy digital products often need a tidy customer download package. Buyers should still receive the complete joined PDF as the primary file; the individual PDFs are included for flexible printing and page replacement.
 
 ## Run Tests
 
 ```bash
 python -m pytest
 ```
+
+## Prepare An Etsy Draft Payload
+
+```bash
+python -m planner_generator.cli.main prepare-etsy-draft \
+  --manifest output/wellness_starter/manifest.json
+```
+
+This writes a local draft payload for manual review. It does not call Etsy, upload files, or publish anything.
 
 ## Architecture
 

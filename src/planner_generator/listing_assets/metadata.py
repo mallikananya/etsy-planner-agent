@@ -36,7 +36,9 @@ def _listing_description(bundle: BundleSpec, theme: Theme) -> str:
         details.append(f"Included pages: {included}.")
     details.extend(
         [
+            "Includes complete joined planner PDFs plus individual page PDFs for flexible printing.",
             "Includes US Letter and A4 PDF files when enabled in the bundle spec.",
+            "Customer ZIP is included as a convenient Etsy upload and download package.",
             "No physical item will be shipped.",
         ]
     )

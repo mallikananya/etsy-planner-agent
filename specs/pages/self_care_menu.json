@@ -1,0 +1,41 @@
+{
+  "id": "self_care_menu",
+  "page_type": "reference",
+  "title": "Self-Care Menu",
+  "subtitle": "Choose care that fits the day instead of forcing a perfect routine.",
+  "metadata": {
+    "collection": "wellness_starter",
+    "collection_label": "six-week wellness system"
+  },
+  "sections": [
+    {
+      "id": "quick_care",
+      "type": "checkbox_list",
+      "title": "Five-Minute Care",
+      "weight": 1.0,
+      "fields": {
+        "items": ["Drink water", "Open a window", "Stretch neck", "Write one line", "Take five breaths"]
+      }
+    },
+    {
+      "id": "deep_care",
+      "type": "checkbox_list",
+      "title": "Deeper Care",
+      "weight": 1.0,
+      "fields": {
+        "items": ["Long walk", "Warm shower", "Cook slowly", "Call someone kind", "Early bedtime"]
+      }
+    },
+    {
+      "id": "personal_menu",
+      "type": "two_column",
+      "title": "My Menu",
+      "weight": 1.2,
+      "fields": {
+        "left_title": "When I Have Energy",
+        "right_title": "When I Need Ease",
+        "line_count": 6
+      }
+    }
+  ]
+}

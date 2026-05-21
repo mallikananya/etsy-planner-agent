@@ -1,25 +1,37 @@
 {
   "id": "minimal_neutral",
-  "name": "Minimal Neutral",
+  "name": "Botanical Editorial",
   "colors": {
-    "background": "#FFFFFF",
-    "heading": "#2F2A25",
-    "body": "#3D3934",
-    "muted": "#8A8178",
-    "accent": "#9A7B64",
-    "divider": "#D8D1C8",
-    "line": "#CDC6BE"
+    "background": "#FFFDF8",
+    "heading": "#26352F",
+    "body": "#3A3D38",
+    "muted": "#78867C",
+    "accent": "#B46D5B",
+    "divider": "#D8E1D6",
+    "line": "#B9C8BA",
+    "top_band": "#F4E1D8",
+    "side_band": "#DCE9DE",
+    "corner_block": "#E8A899",
+    "ornament": "#557667",
+    "page_rule": "#CAD8CB",
+    "section_fill": "#FFFBF5",
+    "section_band": "#ECF4EA",
+    "row_fill": "#F7FBF6",
+    "checkbox_fill": "#FFF7F2",
+    "paper_fill": "#FFFFFF",
+    "label_fill": "#F6DFD6",
+    "prompt_fill": "#F3E5DA"
   },
   "typography": {
-    "title_size": "25",
+    "title_size": "27",
     "subtitle_size": "10",
     "section_title_size": "9",
     "body_size": "9"
   },
   "spacing": {
-    "page_margin": 54,
-    "header_height": 82,
-    "section_gap": 18
+    "page_margin": 52,
+    "header_height": 84,
+    "section_gap": 14
   },
   "strokes": {
     "divider": 0.5,

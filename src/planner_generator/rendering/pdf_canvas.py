@@ -23,13 +23,20 @@ def _hex_to_rgb(color: str) -> Tuple[float, float, float]:
 class PdfCanvas:
     width: float
     height: float
-    _commands: List[str] = field(default_factory=list)
+    _pages: List[List[str]] = field(default_factory=lambda: [[]])
     _fonts: Dict[str, str] = field(
         default_factory=lambda: {
             "sans": "F1",
             "serif": "F2",
         }
     )
+
+    @property
+    def _commands(self) -> List[str]:
+        return self._pages[-1]
+
+    def add_page(self) -> None:
+        self._pages.append([])
 
     def set_stroke(self, color: str, width: float = 1.0) -> None:
         red, green, blue = _hex_to_rgb(color)
@@ -61,6 +68,15 @@ class PdfCanvas:
             self.set_stroke(stroke, stroke_width)
             self._commands.append(f"{x:.2f} {y:.2f} {width:.2f} {height:.2f} re S")
 
+    def polyline(self, points: List[Tuple[float, float]], color: str, width: float = 1.0) -> None:
+        if len(points) < 2:
+            return
+        self.set_stroke(color, width)
+        first_x, first_y = points[0]
+        commands = [f"{first_x:.2f} {first_y:.2f} m"]
+        commands.extend(f"{x:.2f} {y:.2f} l" for x, y in points[1:])
+        self._commands.append(" ".join(commands) + " S")
+
     def text(
         self,
         value: str,
@@ -78,19 +94,38 @@ class PdfCanvas:
     def write(self, path: str | Path) -> None:
         path = Path(path)
         path.parent.mkdir(parents=True, exist_ok=True)
-        stream = "\n".join(self._commands).encode("latin-1", errors="replace")
+        page_count = len(self._pages)
+        page_object_start = 3
+        content_object_start = page_object_start + page_count
+        sans_font_object = content_object_start + page_count
+        serif_font_object = sans_font_object + 1
 
+        kids = " ".join(f"{page_object_start + index} 0 R" for index in range(page_count))
         objects = [
             b"<< /Type /Catalog /Pages 2 0 R >>",
-            b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
-            (
-                f"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 {self.width:.2f} {self.height:.2f}] "
-                f"/Resources << /Font << /F1 5 0 R /F2 6 0 R >> >> /Contents 4 0 R >>"
-            ).encode("ascii"),
-            b"<< /Length " + str(len(stream)).encode("ascii") + b" >>\nstream\n" + stream + b"\nendstream",
-            b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
-            b"<< /Type /Font /Subtype /Type1 /BaseFont /Times-Roman >>",
+            f"<< /Type /Pages /Kids [{kids}] /Count {page_count} >>".encode("ascii"),
         ]
+
+        for index in range(page_count):
+            content_object = content_object_start + index
+            objects.append(
+                (
+                    f"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 {self.width:.2f} {self.height:.2f}] "
+                    f"/Resources << /Font << /F1 {sans_font_object} 0 R /F2 {serif_font_object} 0 R >> >> "
+                    f"/Contents {content_object} 0 R >>"
+                ).encode("ascii")
+            )
+
+        for page_commands in self._pages:
+            stream = "\n".join(page_commands).encode("latin-1", errors="replace")
+            objects.append(b"<< /Length " + str(len(stream)).encode("ascii") + b" >>\nstream\n" + stream + b"\nendstream")
+
+        objects.extend(
+            [
+                b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+                b"<< /Type /Font /Subtype /Type1 /BaseFont /Times-Roman >>",
+            ]
+        )
 
         output = bytearray()
         output.extend(b"%PDF-1.4\n")

@@ -1,0 +1,52 @@
+{
+  "id": "morning_ritual",
+  "page_type": "daily_planner",
+  "title": "Morning Ritual",
+  "subtitle": "Set the tone with intention, care, focus, and a small doable plan.",
+  "metadata": {
+    "collection": "wellness_starter",
+    "collection_label": "six-week wellness system"
+  },
+  "sections": [
+    {
+      "id": "intention",
+      "type": "prompt_box",
+      "title": "Today's Intention",
+      "weight": 1.0,
+      "fields": {
+        "prompt": "How do I want to feel today?",
+        "line_count": 4
+      }
+    },
+    {
+      "id": "energy",
+      "type": "rating_scale",
+      "title": "Morning Check-In",
+      "weight": 1.0,
+      "fields": {
+        "labels": ["Energy", "Mood", "Focus", "Ease"],
+        "steps": 5
+      }
+    },
+    {
+      "id": "anchors",
+      "type": "checkbox_list",
+      "title": "Care Anchors",
+      "weight": 1.0,
+      "fields": {
+        "items": ["Hydrate", "Move gently", "Eat something nourishing", "Step outside", "One kind thought"]
+      }
+    },
+    {
+      "id": "plan",
+      "type": "two_column",
+      "title": "Focused Plan",
+      "weight": 1.2,
+      "fields": {
+        "left_title": "Must Do",
+        "right_title": "Would Feel Good",
+        "line_count": 5
+      }
+    }
+  ]
+}

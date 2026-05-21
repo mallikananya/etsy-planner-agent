@@ -13,6 +13,7 @@ def test_load_sample_bundle_and_theme():
 
     assert bundle.id == "wellness_starter"
     assert bundle.paper_sizes == ["letter", "a4"]
+    assert sum(page.repeat for page in bundle.pages) * bundle.sequence_repeat == 48
     assert theme.id == "minimal_neutral"
 
 

@@ -1,12 +1,14 @@
 {
   "id": "wellness_starter",
   "name": "Wellness Starter Printable Planner",
-  "description": "A cohesive printable planner bundle for gentle weekly planning, daily resets, wellness tracking, and notes.",
+  "description": "A 48-page printable wellness planner bundle for weekly planning, daily resets, rituals, habit tracking, meals, reflection, and notes.",
   "paper_sizes": ["letter", "a4"],
+  "sequence_repeat": 6,
   "metadata": {
     "seo_title": "Wellness Planner Printable, Daily Weekly Planner PDF, Habit Tracker, Self Care Planner, Instant Download",
-    "included_pages": ["Weekly wellness planner", "Daily reset planner", "Lined notes page"],
-    "tags": ["wellness planner", "habit tracker", "self care planner", "daily planner", "weekly planner", "planner pdf"]
+    "included_pages": ["Weekly wellness planner", "Daily reset planner", "Morning ritual page", "Evening reflection page", "Meal and movement planner", "Mood and energy tracker", "Self-care menu", "Lined notes page"],
+    "page_count": 48,
+    "tags": ["wellness planner", "habit tracker", "self care planner", "daily planner", "weekly planner", "planner pdf", "printable planner", "digital planner", "wellness journal"]
   },
   "pages": [
     {
@@ -15,6 +17,26 @@
     },
     {
       "page": "../pages/daily_reset.json",
+      "repeat": 1
+    },
+    {
+      "page": "../pages/morning_ritual.json",
+      "repeat": 1
+    },
+    {
+      "page": "../pages/evening_reflection.json",
+      "repeat": 1
+    },
+    {
+      "page": "../pages/meal_movement.json",
+      "repeat": 1
+    },
+    {
+      "page": "../pages/mood_energy_tracker.json",
+      "repeat": 1
+    },
+    {
+      "page": "../pages/self_care_menu.json",
       "repeat": 1
     },
     {

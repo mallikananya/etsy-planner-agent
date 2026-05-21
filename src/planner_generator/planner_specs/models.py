@@ -8,6 +8,8 @@ SUPPORTED_SECTION_TYPES = {
     "writing_lines",
     "checkbox_list",
     "notes_box",
+    "prompt_box",
+    "rating_scale",
     "tracker_grid",
     "two_column",
 }
@@ -86,6 +88,7 @@ class BundleSpec:
     description: str
     pages: List[BundlePageRef]
     paper_sizes: List[str]
+    sequence_repeat: int = 1
     metadata: Dict[str, Any] = field(default_factory=dict)
 
     @classmethod
@@ -94,11 +97,15 @@ class BundleSpec:
         if not pages:
             raise ValueError("Bundle must include at least one page reference.")
         paper_sizes = [str(size).lower() for size in data.get("paper_sizes", ["letter"])]
+        sequence_repeat = int(data.get("sequence_repeat", 1))
+        if sequence_repeat < 1:
+            raise ValueError("Bundle sequence_repeat must be at least 1.")
         return cls(
             id=str(data["id"]),
             name=str(data["name"]),
             description=str(data.get("description", "")),
             pages=pages,
             paper_sizes=paper_sizes,
+            sequence_repeat=sequence_repeat,
             metadata=dict(data.get("metadata", {})),
         )

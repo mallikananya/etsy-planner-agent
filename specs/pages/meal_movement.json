@@ -1,0 +1,41 @@
+{
+  "id": "meal_movement",
+  "page_type": "weekly_planner",
+  "title": "Meal + Movement Planner",
+  "subtitle": "Plan nourishment and movement without making the week feel crowded.",
+  "metadata": {
+    "collection": "wellness_starter",
+    "collection_label": "six-week wellness system"
+  },
+  "sections": [
+    {
+      "id": "meals",
+      "type": "two_column",
+      "title": "Simple Meals",
+      "weight": 1.2,
+      "fields": {
+        "left_title": "Breakfast / Lunch",
+        "right_title": "Dinner / Snacks",
+        "line_count": 7
+      }
+    },
+    {
+      "id": "movement",
+      "type": "checkbox_list",
+      "title": "Movement Ideas",
+      "weight": 0.9,
+      "fields": {
+        "items": ["Walk", "Stretch", "Strength", "Yoga", "Dance", "Restorative rest"]
+      }
+    },
+    {
+      "id": "shopping",
+      "type": "writing_lines",
+      "title": "Tiny Grocery List",
+      "weight": 1.0,
+      "fields": {
+        "count": 8
+      }
+    }
+  ]
+}

@@ -1,0 +1,49 @@
+{
+  "id": "evening_reflection",
+  "page_type": "reflection",
+  "title": "Evening Reflection",
+  "subtitle": "Close the day with gratitude, release, and a softer plan for tomorrow.",
+  "metadata": {
+    "collection": "wellness_starter",
+    "collection_label": "six-week wellness system"
+  },
+  "sections": [
+    {
+      "id": "gratitude",
+      "type": "writing_lines",
+      "title": "Three Good Things",
+      "weight": 1.0,
+      "fields": {
+        "count": 3
+      }
+    },
+    {
+      "id": "release",
+      "type": "prompt_box",
+      "title": "Release",
+      "weight": 1.1,
+      "fields": {
+        "prompt": "What can I stop carrying tonight?",
+        "line_count": 5
+      }
+    },
+    {
+      "id": "tomorrow",
+      "type": "checkbox_list",
+      "title": "Tomorrow Setup",
+      "weight": 1.0,
+      "fields": {
+        "items": ["Pick clothes", "Prep water", "Choose top priority", "Clear one surface", "Set bedtime reminder"]
+      }
+    },
+    {
+      "id": "notes",
+      "type": "notes_box",
+      "title": "Quiet Notes",
+      "weight": 1.0,
+      "fields": {
+        "line_count": 5
+      }
+    }
+  ]
+}

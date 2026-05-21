@@ -4,6 +4,7 @@ import argparse
 from pathlib import Path
 
 from planner_generator.exports.bundle_exporter import export_bundle
+from planner_generator.etsy_integration.client import EtsyDraftClient
 from planner_generator.rendering.page_renderer import render_page_to_pdf
 from planner_generator.planner_specs.loader import load_page_spec
 from planner_generator.theme_engine.loader import load_theme
@@ -33,6 +34,7 @@ def main() -> None:
 
     etsy_parser = subparsers.add_parser("prepare-etsy-draft", help="Reserved command for future Etsy draft creation.")
     etsy_parser.add_argument("--manifest", required=True)
+    etsy_parser.add_argument("--output", default=None, help="Directory for the draft payload JSON.")
 
     args = parser.parse_args()
 
@@ -47,7 +49,11 @@ def main() -> None:
         print(f"Wrote bundle output to {result.output_dir}")
         print(f"Manifest: {result.manifest_path}")
     elif args.command == "prepare-etsy-draft":
-        raise SystemExit("Etsy draft creation is planned for a later phase and will never auto-publish.")
+        output_dir = args.output or str(Path(args.manifest).parent / "listing")
+        result = EtsyDraftClient().create_draft_plan(args.manifest, output_dir)
+        print("Prepared Etsy draft payload for manual review.")
+        print(f"Payload: {result.output_path}")
+        print("No Etsy API call was made and nothing was published.")
 
 
 if __name__ == "__main__":

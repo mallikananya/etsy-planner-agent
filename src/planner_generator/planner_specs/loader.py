@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 
 from planner_generator.planner_specs.models import BundleSpec, PageSpec
+from planner_generator.planner_specs.validation import validate_bundle_spec, validate_page_spec
 
 
 def _load_json(path: str | Path) -> dict:
@@ -12,8 +13,12 @@ def _load_json(path: str | Path) -> dict:
 
 
 def load_page_spec(path: str | Path) -> PageSpec:
-    return PageSpec.from_dict(_load_json(path))
+    page = PageSpec.from_dict(_load_json(path))
+    validate_page_spec(page)
+    return page
 
 
 def load_bundle_spec(path: str | Path) -> BundleSpec:
-    return BundleSpec.from_dict(_load_json(path))
+    bundle = BundleSpec.from_dict(_load_json(path))
+    validate_bundle_spec(bundle)
+    return bundle
