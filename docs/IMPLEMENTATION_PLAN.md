@@ -4,7 +4,7 @@ This project should be built incrementally. Each phase should leave the reposito
 
 ## Phase 1: Generation Foundations
 
-Status: in progress.
+Status: complete.
 
 Goals:
 
@@ -25,6 +25,8 @@ Non-goals:
 - Canva workflows.
 
 ## Phase 2: Export Quality
+
+Status: in progress.
 
 Goals:
 
@@ -60,4 +62,3 @@ Goals:
 - Do not add infrastructure until a local workflow needs it.
 - Keep CLI commands simple and documented.
 - Commit and push completed slices frequently.
-

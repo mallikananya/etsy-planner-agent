@@ -38,7 +38,7 @@ class EtsyDraftClient:
             "when_made": "made_to_order",
             "taxonomy_note": "Select the most relevant Etsy printable planner taxonomy in the seller UI.",
             "customer_files": _customer_files(manifest),
-            "preview_assets": [str(path.relative_to(bundle_dir)) for path in sorted((listing_dir / "previews").glob("*.svg"))],
+            "preview_assets": [str(path.relative_to(bundle_dir)) for path in sorted((bundle_dir / "previews").rglob("*.png"))],
             "safety": {
                 "auto_publish": False,
                 "requires_manual_review": True,

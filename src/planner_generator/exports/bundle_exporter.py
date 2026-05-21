@@ -56,12 +56,13 @@ def export_bundle(bundle_path: str | Path, theme: Theme, output_root: str | Path
     (listing_dir / "tags.json").write_text(json.dumps(listing_metadata["tags"], indent=2) + "\n", encoding="utf-8")
     (listing_dir / "metadata.json").write_text(json.dumps(listing_metadata, indent=2) + "\n", encoding="utf-8")
     generated_files.extend([listing_dir / "title.txt", listing_dir / "description.txt", listing_dir / "tags.json", listing_dir / "metadata.json"])
-    generated_files.extend(write_listing_preview_assets(listing_dir, bundle, theme, pages))
+    preview_files = write_listing_preview_assets(output_dir, bundle, theme, pages)
+    generated_files.extend(preview_files)
 
     zip_path = create_customer_zip(output_dir, primary_customer_files)
     generated_files.append(zip_path)
 
-    manifest = _build_manifest(bundle, theme, pages, generated_files)
+    manifest = _build_manifest(bundle, theme, pages, generated_files, preview_files, output_dir)
     manifest_path = output_dir / "manifest.json"
     manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
     generated_files.append(manifest_path)
@@ -89,7 +90,14 @@ def _load_bundle_pages(bundle: BundleSpec, bundle_dir: Path) -> List[PageSpec]:
     return pages
 
 
-def _build_manifest(bundle: BundleSpec, theme: Theme, pages: List[PageSpec], generated_files: List[Path]) -> Dict[str, object]:
+def _build_manifest(
+    bundle: BundleSpec,
+    theme: Theme,
+    pages: List[PageSpec],
+    generated_files: List[Path],
+    preview_files: List[Path],
+    output_dir: Path,
+) -> Dict[str, object]:
     return {
         "bundle_id": bundle.id,
         "bundle_name": bundle.name,
@@ -101,5 +109,6 @@ def _build_manifest(bundle: BundleSpec, theme: Theme, pages: List[PageSpec], gen
             str(Path("customer_files") / size_id / f"{bundle.id}_{size_id}_complete.pdf")
             for size_id in bundle.paper_sizes
         ],
+        "preview_files": [str(path.relative_to(output_dir)) for path in preview_files],
         "files": [str(path) for path in generated_files],
     }

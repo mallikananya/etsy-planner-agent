@@ -20,22 +20,24 @@ def render_page_to_pdf(page: PageSpec, theme: Theme, page_size_id: str, output_p
 
 
 def render_pages_to_pdf(pages: Iterable[PageSpec], theme: Theme, page_size_id: str, output_path: str | Path) -> None:
+    page_list = list(pages)
     page_size = get_page_size(page_size_id)
     canvas = PdfCanvas(width=page_size.width, height=page_size.height)
-    for index, page in enumerate(pages):
+    for index, page in enumerate(page_list):
         if index:
             canvas.add_page()
         page_layout = layout_page(page, page_size, theme)
-        _draw_page(canvas, page, page_layout, theme)
+        _draw_page(canvas, page, page_layout, theme, page_number=index + 1, page_count=len(page_list))
     canvas.write(output_path)
 
 
-def _draw_page(canvas: PdfCanvas, page: PageSpec, layout: PageLayout, theme: Theme) -> None:
+def _draw_page(canvas: PdfCanvas, page: PageSpec, layout: PageLayout, theme: Theme, page_number: int | None = None, page_count: int | None = None) -> None:
     canvas.rect(0, 0, layout.page_size.width, layout.page_size.height, fill=theme.color("background", "#FFFFFF"))
     _draw_page_frame(canvas, layout, theme)
     _draw_header(canvas, page, layout.header_bounds, theme)
     for section in layout.sections:
         _draw_section(canvas, section, theme)
+    _draw_footer(canvas, page, layout, theme, page_number, page_count)
 
 
 def _draw_page_frame(canvas: PdfCanvas, layout: PageLayout, theme: Theme) -> None:
@@ -78,6 +80,29 @@ def _draw_header(canvas: PdfCanvas, page: PageSpec, bounds: Rect, theme: Theme) 
         theme.color("divider"),
         theme.stroke("divider", 0.5),
     )
+
+
+def _draw_footer(
+    canvas: PdfCanvas,
+    page: PageSpec,
+    layout: PageLayout,
+    theme: Theme,
+    page_number: int | None,
+    page_count: int | None,
+) -> None:
+    footer_y = layout.content_bounds.y - 4
+    canvas.line(
+        layout.content_bounds.x,
+        footer_y + 14,
+        layout.content_bounds.right,
+        footer_y + 14,
+        theme.color("divider"),
+        0.25,
+    )
+    canvas.text(page.page_type.replace("_", " ").upper(), layout.content_bounds.x, footer_y, 7, theme.color("muted"), font="sans")
+    if page_number is not None and page_count is not None:
+        label = f"PAGE {page_number:02d} / {page_count:02d}"
+        canvas.text(label, layout.content_bounds.right - 70, footer_y, 7, theme.color("muted"), font="sans")
 
 
 def _draw_section(canvas: PdfCanvas, section: LayoutSection, theme: Theme) -> None:

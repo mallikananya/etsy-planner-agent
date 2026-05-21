@@ -9,7 +9,7 @@ See [docs/PRD.md](docs/PRD.md) for the product requirements and [docs/IMPLEMENTA
 - Declarative bundle and page specs
 - Reusable theme definitions
 - Layout primitives separated from rendering
-- Deterministic PDF export using built-in Python only
+- Deterministic PDF and PNG preview export using built-in Python only
 - Predictable output folders and manifests
 - Placeholder seams for listing assets, SEO, and future Etsy draft creation
 
@@ -34,7 +34,7 @@ python -m planner_generator.cli.main build-bundle \
   --output output
 ```
 
-The sample writes complete joined customer PDFs, individual page PDFs, a ZIP package, preview SVGs, a manifest, and starter listing metadata under:
+The sample writes complete joined customer PDFs, individual page PDFs, a ZIP package, PNG previews, a manifest, and starter listing metadata under:
 
 ```text
 output/wellness_starter/

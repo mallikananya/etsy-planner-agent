@@ -22,3 +22,5 @@ def test_prepare_etsy_draft_payload_uses_primary_customer_files(tmp_path):
         "customer_files/letter/wellness_starter_letter_complete.pdf",
         "customer_files/a4/wellness_starter_a4_complete.pdf",
     ]
+    assert "previews/pngs/00_cover.png" in payload["preview_assets"]
+    assert "previews/collages/01_listing_collage.png" in payload["preview_assets"]
