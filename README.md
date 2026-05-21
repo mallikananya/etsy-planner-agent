@@ -65,6 +65,14 @@ output/wellness_starter/
 
 The ZIP exists because Etsy digital products often need a tidy customer download package. Buyers should still receive the complete joined PDF as the primary file; the individual PDFs are included for flexible printing and page replacement.
 
+The bundle manifest includes explicit Etsy upload planning fields:
+
+- `primary_customer_files`
+- `preview_files`
+- `zip_file`
+- `etsy_upload`
+- `file_details`
+
 ## Run Tests
 
 ```bash

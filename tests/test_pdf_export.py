@@ -29,6 +29,11 @@ def test_export_bundle_writes_manifest_and_pdfs(tmp_path):
     assert b"PAGE 01 / 48" in combined_pdf
     assert (result.output_dir / "previews/pngs/00_cover.png").read_bytes().startswith(b"\x89PNG\r\n\x1a\n")
     manifest = json.loads(result.manifest_path.read_text(encoding="utf-8"))
+    assert manifest["etsy_upload"]["ready_for_draft"] is True
+    assert manifest["etsy_upload"]["digital_file_count"] == 2
+    assert manifest["zip_file"] == "customer_files/zip/wellness_starter_customer_files.zip"
+    assert "individual_page_files" in manifest
+    assert all(file_detail["size_bytes"] > 0 for file_detail in manifest["file_details"])
     assert manifest["preview_files"] == [
         "previews/pngs/00_cover.png",
         "previews/pngs/01_wellness_weekly.png",

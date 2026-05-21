@@ -22,5 +22,9 @@ def test_prepare_etsy_draft_payload_uses_primary_customer_files(tmp_path):
         "customer_files/letter/wellness_starter_letter_complete.pdf",
         "customer_files/a4/wellness_starter_a4_complete.pdf",
     ]
+    assert payload["product"]["bundle_id"] == "wellness_starter"
+    assert payload["upload_plan"]["ready_for_draft"] is True
+    assert payload["upload_plan"]["digital_file_count"] == 2
+    assert payload["review_warnings"] == []
     assert "previews/pngs/00_cover.png" in payload["preview_assets"]
     assert "previews/collages/01_listing_collage.png" in payload["preview_assets"]
