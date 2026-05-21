@@ -1,0 +1,40 @@
+{
+  "id": "earthy_olive",
+  "name": "Earthy Olive",
+  "colors": {
+    "background": "#FDFCF6",
+    "heading": "#293126",
+    "body": "#3D4437",
+    "muted": "#77806F",
+    "accent": "#7F8B55",
+    "divider": "#D8DEC8",
+    "line": "#BBC6A7",
+    "top_band": "#E5EBD7",
+    "side_band": "#F0E8D6",
+    "corner_block": "#B7BF86",
+    "ornament": "#5F6F43",
+    "page_rule": "#CFD8BD",
+    "section_fill": "#FFFDF6",
+    "section_band": "#EEF3E4",
+    "row_fill": "#F6FAF0",
+    "checkbox_fill": "#FFFDF8",
+    "paper_fill": "#FFFFFF",
+    "label_fill": "#E3E9D2",
+    "prompt_fill": "#F1E5D4"
+  },
+  "typography": {
+    "title_size": "27",
+    "subtitle_size": "10",
+    "section_title_size": "9",
+    "body_size": "9"
+  },
+  "spacing": {
+    "page_margin": 52,
+    "header_height": 84,
+    "section_gap": 14
+  },
+  "strokes": {
+    "divider": 0.5,
+    "line": 0.3
+  }
+}

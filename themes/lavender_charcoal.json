@@ -1,0 +1,40 @@
+{
+  "id": "lavender_charcoal",
+  "name": "Lavender Charcoal",
+  "colors": {
+    "background": "#FEFCFF",
+    "heading": "#2F3038",
+    "body": "#42434B",
+    "muted": "#7E7B91",
+    "accent": "#8D7AB8",
+    "divider": "#DDD7EC",
+    "line": "#C6BEDD",
+    "top_band": "#ECE5F7",
+    "side_band": "#F2EFF7",
+    "corner_block": "#C7B7E8",
+    "ornament": "#6F5F94",
+    "page_rule": "#D6CEE8",
+    "section_fill": "#FFFCFF",
+    "section_band": "#F0EAF8",
+    "row_fill": "#F8F4FE",
+    "checkbox_fill": "#FFFCFF",
+    "paper_fill": "#FFFFFF",
+    "label_fill": "#E6DDF3",
+    "prompt_fill": "#F3E9F4"
+  },
+  "typography": {
+    "title_size": "27",
+    "subtitle_size": "10",
+    "section_title_size": "9",
+    "body_size": "9"
+  },
+  "spacing": {
+    "page_margin": 52,
+    "header_height": 84,
+    "section_gap": 14
+  },
+  "strokes": {
+    "divider": 0.5,
+    "line": 0.3
+  }
+}

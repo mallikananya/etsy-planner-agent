@@ -1,0 +1,40 @@
+{
+  "id": "elegant_monochrome",
+  "name": "Elegant Monochrome",
+  "colors": {
+    "background": "#FFFFFF",
+    "heading": "#1F1F1F",
+    "body": "#333333",
+    "muted": "#777777",
+    "accent": "#4A4A4A",
+    "divider": "#D8D8D8",
+    "line": "#BFBFBF",
+    "top_band": "#EFEFEF",
+    "side_band": "#F6F6F6",
+    "corner_block": "#D2D2D2",
+    "ornament": "#555555",
+    "page_rule": "#CCCCCC",
+    "section_fill": "#FCFCFC",
+    "section_band": "#F0F0F0",
+    "row_fill": "#F8F8F8",
+    "checkbox_fill": "#FFFFFF",
+    "paper_fill": "#FFFFFF",
+    "label_fill": "#E9E9E9",
+    "prompt_fill": "#F4F4F4"
+  },
+  "typography": {
+    "title_size": "28",
+    "subtitle_size": "10",
+    "section_title_size": "9",
+    "body_size": "9"
+  },
+  "spacing": {
+    "page_margin": 56,
+    "header_height": 86,
+    "section_gap": 15
+  },
+  "strokes": {
+    "divider": 0.45,
+    "line": 0.28
+  }
+}

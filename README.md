@@ -41,6 +41,11 @@ themes/minimal_neutral.json
 themes/soft_feminine.json
 themes/muted_luxury.json
 themes/academic_pastel.json
+themes/cozy_productivity.json
+themes/elegant_monochrome.json
+themes/earthy_olive.json
+themes/lavender_charcoal.json
+themes/navy_mist.json
 ```
 
 The sample writes complete joined customer PDFs, individual page PDFs, a ZIP package, PNG previews, a manifest, and starter listing metadata under:

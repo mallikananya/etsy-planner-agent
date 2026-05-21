@@ -1,0 +1,40 @@
+{
+  "id": "cozy_productivity",
+  "name": "Cozy Productivity",
+  "colors": {
+    "background": "#FFFDF9",
+    "heading": "#332B27",
+    "body": "#4A403A",
+    "muted": "#8B7A6D",
+    "accent": "#B87954",
+    "divider": "#E0D4C8",
+    "line": "#CDBEB0",
+    "top_band": "#F3E3D4",
+    "side_band": "#EFE8DE",
+    "corner_block": "#D7A078",
+    "ornament": "#8A6044",
+    "page_rule": "#D8C8B9",
+    "section_fill": "#FFFAF3",
+    "section_band": "#F5E9DA",
+    "row_fill": "#FBF4EA",
+    "checkbox_fill": "#FFF9F2",
+    "paper_fill": "#FFFFFF",
+    "label_fill": "#EFDAC8",
+    "prompt_fill": "#F6E4D2"
+  },
+  "typography": {
+    "title_size": "27",
+    "subtitle_size": "10",
+    "section_title_size": "9",
+    "body_size": "9"
+  },
+  "spacing": {
+    "page_margin": 53,
+    "header_height": 84,
+    "section_gap": 14
+  },
+  "strokes": {
+    "divider": 0.5,
+    "line": 0.3
+  }
+}

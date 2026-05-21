@@ -1,0 +1,40 @@
+{
+  "id": "navy_mist",
+  "name": "Navy Mist",
+  "colors": {
+    "background": "#FBFDFF",
+    "heading": "#1F3347",
+    "body": "#34465A",
+    "muted": "#748394",
+    "accent": "#5F7FA1",
+    "divider": "#D2DCE6",
+    "line": "#B9C8D8",
+    "top_band": "#DEEAF3",
+    "side_band": "#EAF2F5",
+    "corner_block": "#AFC7DA",
+    "ornament": "#48647E",
+    "page_rule": "#CBD9E4",
+    "section_fill": "#FCFEFF",
+    "section_band": "#E8F1F7",
+    "row_fill": "#F4F9FC",
+    "checkbox_fill": "#FFFFFF",
+    "paper_fill": "#FFFFFF",
+    "label_fill": "#DDEAF2",
+    "prompt_fill": "#EAF1F4"
+  },
+  "typography": {
+    "title_size": "27",
+    "subtitle_size": "10",
+    "section_title_size": "9",
+    "body_size": "9"
+  },
+  "spacing": {
+    "page_margin": 53,
+    "header_height": 85,
+    "section_gap": 14
+  },
+  "strokes": {
+    "divider": 0.5,
+    "line": 0.3
+  }
+}
