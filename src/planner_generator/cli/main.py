@@ -8,6 +8,7 @@ from planner_generator.bundle_builder.batch import build_all
 from planner_generator.exports.bundle_exporter import export_bundle
 from planner_generator.etsy_integration.client import EtsyDraftClient
 from planner_generator.etsy_integration.oauth import env_lines_for_tokens, finish_oauth_flow, refresh_oauth_token, start_oauth_flow
+from planner_generator.etsy_integration.shops import env_line_for_shop, lookup_shop
 from planner_generator.etsy_integration.submission import submit_etsy_draft
 from planner_generator.etsy_integration.taxonomy import env_line_for_taxonomy, search_taxonomy_candidates, select_taxonomy
 from planner_generator.rendering.page_renderer import render_page_to_pdf
@@ -78,6 +79,11 @@ def main() -> None:
     taxonomy_select_parser.add_argument("--taxonomy-id", required=True)
     taxonomy_select_parser.add_argument("--output", default=".etsy/taxonomy_selection.json")
 
+    shop_lookup_parser = subparsers.add_parser("etsy-shop-lookup", help="Look up Etsy shops for the authenticated account.")
+    shop_lookup_parser.add_argument("--shop-id", default=None, help="Optional shop id to select when multiple shops are returned.")
+    shop_lookup_parser.add_argument("--shop-name", default=None, help="Optional shop name to select when multiple shops are returned.")
+    shop_lookup_parser.add_argument("--output", default=".etsy/shop_selection.json")
+
     args = parser.parse_args()
 
     if args.command == "build-page":
@@ -138,6 +144,11 @@ def main() -> None:
         print(f"Wrote taxonomy selection to {result.output_path}")
         print("Add or update this line in your local .env:")
         print(env_line_for_taxonomy(result.selection))
+    elif args.command == "etsy-shop-lookup":
+        result = lookup_shop(output_path=args.output, shop_id=args.shop_id, shop_name=args.shop_name)
+        print(f"Wrote shop selection to {result.output_path}")
+        print("Add or update this line in your local .env:")
+        print(env_line_for_shop(result.shop))
 
 
 if __name__ == "__main__":

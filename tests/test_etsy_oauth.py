@@ -10,6 +10,9 @@ class FakeOAuthTransport:
         self.response = response
         self.calls = []
 
+    def get_json(self, url, headers):
+        raise AssertionError("OAuth should not use GET requests.")
+
     def post_json(self, url, headers, payload):
         raise AssertionError("OAuth should use form posts.")
 

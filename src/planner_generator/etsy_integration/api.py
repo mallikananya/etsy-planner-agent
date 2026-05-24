@@ -13,6 +13,9 @@ from planner_generator.etsy_integration.config import EtsyApiConfig
 
 
 class EtsyTransport(Protocol):
+    def get_json(self, url: str, headers: Dict[str, str]) -> Dict[str, object]:
+        ...
+
     def post_json(self, url: str, headers: Dict[str, str], payload: Dict[str, object]) -> Dict[str, object]:
         ...
 
@@ -24,6 +27,16 @@ class EtsyTransport(Protocol):
 
 
 class UrllibEtsyTransport:
+    def get_json(self, url: str, headers: Dict[str, str]) -> Dict[str, object]:
+        request = urllib.request.Request(url=url, headers=headers, method="GET")
+        try:
+            with urllib.request.urlopen(request, timeout=30) as response:
+                body = response.read().decode("utf-8")
+                return json.loads(body) if body else {}
+        except urllib.error.HTTPError as error:
+            body = error.read().decode("utf-8", errors="replace")
+            raise RuntimeError(f"Etsy API request failed with status {error.code}: {body}") from error
+
     def post_json(self, url: str, headers: Dict[str, str], payload: Dict[str, object]) -> Dict[str, object]:
         data = json.dumps(payload).encode("utf-8")
         request = urllib.request.Request(url=url, data=data, headers=headers, method="POST")
@@ -91,6 +104,12 @@ class EtsyDraftApiClient:
             {"name": name or path.name},
             {"file": path},
         )
+
+    def find_user_shops(self) -> Dict[str, object]:
+        if not self.config.api_key or not self.config.access_token:
+            raise ValueError("ETSY_API_KEY and ETSY_ACCESS_TOKEN are required to look up shops.")
+        url = f"{self.config.api_base_url}/users/me/shops"
+        return self.transport.get_json(url, self.config.headers())
 
 
 def _create_listing_request(draft_payload: Dict[str, object], config: EtsyApiConfig) -> Dict[str, object]:

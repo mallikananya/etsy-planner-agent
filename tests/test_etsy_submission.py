@@ -19,6 +19,9 @@ class FakeTransport:
         self.calls = []
         self.multipart_calls = []
 
+    def get_json(self, url, headers):
+        raise AssertionError("Submission should not use shop lookup GET requests.")
+
     def post_json(self, url, headers, payload):
         self.calls.append({"url": url, "headers": headers, "payload": payload})
         return {"listing_id": 123456789, "state": "draft"}

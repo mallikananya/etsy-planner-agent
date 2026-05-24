@@ -142,6 +142,14 @@ python -m planner_generator.cli.main etsy-taxonomy-select --taxonomy-id 2078
 
 Always confirm the taxonomy in Etsy before live listing creation.
 
+Look up your Etsy shop after OAuth succeeds:
+
+```bash
+python -m planner_generator.cli.main etsy-shop-lookup
+```
+
+The command writes `.etsy/shop_selection.json` and prints `ETSY_SHOP_ID=...` for your local `.env`.
+
 ## Architecture
 
 ```text
