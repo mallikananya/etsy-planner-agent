@@ -77,6 +77,30 @@ class NicheBrief:
         }
 
 
+@dataclass(frozen=True)
+class ProductConcept:
+    product_name: str
+    buyer_persona: str
+    promise: str
+    listing_angle: str
+    page_strategy: List[str]
+    included_page_titles: List[str]
+    visual_direction: List[str]
+    selected_page_ids: List[str]
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "product_name": self.product_name,
+            "buyer_persona": self.buyer_persona,
+            "promise": self.promise,
+            "listing_angle": self.listing_angle,
+            "page_strategy": self.page_strategy,
+            "included_page_titles": self.included_page_titles,
+            "visual_direction": self.visual_direction,
+            "selected_page_ids": self.selected_page_ids,
+        }
+
+
 def _string_list(value: Any) -> List[str]:
     if isinstance(value, str):
         return [value]

@@ -72,10 +72,38 @@ The bundle manifest includes explicit Etsy upload planning fields:
 - `preview_files`
 - `zip_file`
 - `market_brief`
+- `product_concept`
 - `etsy_upload`
 - `file_details`
 
-## Build From Live Market Signals
+## Build From Current Etsy Trend Signals
+
+For a hands-off run before the Etsy API key is approved, let the bot fetch public Etsy related-search signals, rank them, generate the product concept, dynamically select/reframe planner pages, and write Etsy-ready assets:
+
+```bash
+python -m planner_generator.cli.main build-bundle \
+  --bundle specs/bundles/wellness_starter.json \
+  --theme themes/minimal_neutral.json \
+  --discover-market-trends \
+  --output output
+```
+
+You can also save the discovered signals for review:
+
+```bash
+python -m planner_generator.cli.main discover-market-trends \
+  --output output/current_etsy_signals.json
+```
+
+Preview the chosen niche and product concept:
+
+```bash
+python -m planner_generator.cli.main analyze-market-signals \
+  --bundle specs/bundles/wellness_starter.json \
+  --discover-market-trends
+```
+
+## Build From Imported Market Signals
 
 While the Etsy API key is pending, feed the generator a JSON file from current Etsy research, ads data, keyword tools, or manual trend notes. The code ranks those signals at build time and uses the selected niche brief for the listing title, description, tags, manifest, and preview mockup direction.
 
@@ -99,7 +127,7 @@ While the Etsy API key is pending, feed the generator a JSON file from current E
 }
 ```
 
-Preview the selected niche:
+Preview the selected niche and product concept:
 
 ```bash
 python -m planner_generator.cli.main analyze-market-signals \

@@ -8,7 +8,9 @@ from typing import Dict, List
 
 from planner_generator.listing_assets.constraints import ETSY_DIGITAL_FILE_MAX_COUNT, ETSY_LISTING_IMAGE_MAX_COUNT
 from planner_generator.listing_assets.metadata import generate_listing_metadata
-from planner_generator.market_intelligence.models import MarketSignal, NicheBrief
+from planner_generator.market_intelligence.concepts import build_product_concept
+from planner_generator.market_intelligence.models import MarketSignal, NicheBrief, ProductConcept
+from planner_generator.market_intelligence.page_selection import product_concept_with_pages, repeat_pages_for_bundle, select_concept_pages
 from planner_generator.market_intelligence.signals import build_market_brief
 from planner_generator.packaging.zipper import create_customer_zip
 from planner_generator.planner_specs.loader import load_bundle_spec, load_page_spec
@@ -30,9 +32,22 @@ class BundleExportResult:
 def export_bundle(bundle_path: str | Path, theme: Theme, output_root: str | Path, market_signals: List[MarketSignal] | None = None) -> BundleExportResult:
     bundle_path = Path(bundle_path)
     bundle = load_bundle_spec(bundle_path)
-    pages = _load_bundle_pages(bundle, bundle_path.parent)
+    base_pages = _load_bundle_base_pages(bundle, bundle_path.parent)
+    pages = repeat_pages_for_bundle(base_pages, bundle.sequence_repeat)
     validate_page_count(bundle, pages)
     market_brief = build_market_brief(bundle, pages, market_signals)
+    product_concept = build_product_concept(market_brief, bundle, pages)
+    if market_signals:
+        candidate_pages = _load_page_library(bundle_path.parent / "../pages")
+        if candidate_pages:
+            base_pages = select_concept_pages(candidate_pages, product_concept, market_brief, bundle, target_count=len(bundle.pages))
+        product_concept = product_concept_with_pages(product_concept, base_pages)
+        pages = repeat_pages_for_bundle(base_pages, bundle.sequence_repeat)
+        validate_page_count(bundle, pages)
+        market_brief = build_market_brief(bundle, pages, market_signals)
+        product_concept = product_concept_with_pages(build_product_concept(market_brief, bundle, pages), base_pages)
+    else:
+        product_concept = product_concept_with_pages(product_concept, base_pages)
     output_dir = Path(output_root) / bundle.id
     if output_dir.exists():
         shutil.rmtree(output_dir)
@@ -56,7 +71,7 @@ def export_bundle(bundle_path: str | Path, theme: Theme, output_root: str | Path
 
     listing_dir = output_dir / "listing"
     listing_dir.mkdir(parents=True, exist_ok=True)
-    listing_metadata = generate_listing_metadata(bundle, theme, market_brief)
+    listing_metadata = generate_listing_metadata(bundle, theme, market_brief, product_concept)
     (listing_dir / "title.txt").write_text(listing_metadata["title"] + "\n", encoding="utf-8")
     (listing_dir / "description.txt").write_text(listing_metadata["description"] + "\n", encoding="utf-8")
     (listing_dir / "tags.json").write_text(json.dumps(listing_metadata["tags"], indent=2) + "\n", encoding="utf-8")
@@ -68,7 +83,7 @@ def export_bundle(bundle_path: str | Path, theme: Theme, output_root: str | Path
     zip_path = create_customer_zip(output_dir, primary_customer_files)
     generated_files.append(zip_path)
 
-    manifest = _build_manifest(bundle, theme, pages, generated_files, primary_customer_files, individual_page_files, preview_files, zip_path, output_dir, market_brief)
+    manifest = _build_manifest(bundle, theme, pages, generated_files, primary_customer_files, individual_page_files, preview_files, zip_path, output_dir, market_brief, product_concept)
     manifest_path = output_dir / "manifest.json"
     manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
     generated_files.append(manifest_path)
@@ -81,8 +96,7 @@ def export_bundle(bundle_path: str | Path, theme: Theme, output_root: str | Path
     )
 
 
-def _load_bundle_pages(bundle: BundleSpec, bundle_dir: Path) -> List[PageSpec]:
-    pages: List[PageSpec] = []
+def _load_bundle_base_pages(bundle: BundleSpec, bundle_dir: Path) -> List[PageSpec]:
     loaded_pages: List[PageSpec] = []
     for page_ref in bundle.pages:
         page_path = Path(page_ref.page)
@@ -91,9 +105,13 @@ def _load_bundle_pages(bundle: BundleSpec, bundle_dir: Path) -> List[PageSpec]:
         page = load_page_spec(page_path)
         for _ in range(page_ref.repeat):
             loaded_pages.append(page)
-    for _ in range(bundle.sequence_repeat):
-        pages.extend(loaded_pages)
-    return pages
+    return loaded_pages
+
+
+def _load_page_library(pages_dir: Path) -> List[PageSpec]:
+    if not pages_dir.exists():
+        return []
+    return [load_page_spec(path) for path in sorted(pages_dir.resolve().glob("*.json"))]
 
 
 def _build_manifest(
@@ -107,6 +125,7 @@ def _build_manifest(
     zip_path: Path,
     output_dir: Path,
     market_brief: NicheBrief,
+    product_concept: ProductConcept,
 ) -> Dict[str, object]:
     primary_customer_file_refs = [str(path.relative_to(output_dir)) for path in primary_customer_files]
     preview_file_refs = [str(path.relative_to(output_dir)) for path in preview_files]
@@ -118,6 +137,7 @@ def _build_manifest(
         "page_count": len(pages),
         "paper_sizes": bundle.paper_sizes,
         "market_brief": market_brief.to_dict(),
+        "product_concept": product_concept.to_dict(),
         "primary_customer_files": primary_customer_file_refs,
         "individual_page_files": [str(path.relative_to(output_dir)) for path in individual_page_files],
         "preview_files": preview_file_refs,

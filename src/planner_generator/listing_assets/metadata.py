@@ -3,17 +3,17 @@ from __future__ import annotations
 from typing import Dict, List
 
 from planner_generator.listing_assets.constraints import ETSY_DESCRIPTION_MAX_LENGTH, ETSY_TITLE_MAX_LENGTH, truncate_text
-from planner_generator.market_intelligence.models import NicheBrief
+from planner_generator.market_intelligence.models import NicheBrief, ProductConcept
 from planner_generator.planner_specs.models import BundleSpec
 from planner_generator.seo.tags import generate_tags
 from planner_generator.theme_engine.models import Theme
 
 
-def generate_listing_metadata(bundle: BundleSpec, theme: Theme, market_brief: NicheBrief | None = None) -> Dict[str, object]:
+def generate_listing_metadata(bundle: BundleSpec, theme: Theme, market_brief: NicheBrief | None = None, product_concept: ProductConcept | None = None) -> Dict[str, object]:
     tags = generate_tags(bundle, market_brief)
-    title = _listing_title(bundle, market_brief)
-    description = _listing_description(bundle, theme, market_brief)
-    included_pages = [str(page) for page in bundle.metadata.get("included_pages", [])]
+    title = _listing_title(bundle, market_brief, product_concept)
+    description = _listing_description(bundle, theme, market_brief, product_concept)
+    included_pages = product_concept.included_page_titles if product_concept else [str(page) for page in bundle.metadata.get("included_pages", [])]
     metadata: Dict[str, object] = {
         "title": title,
         "description": description,
@@ -39,26 +39,36 @@ def generate_listing_metadata(bundle: BundleSpec, theme: Theme, market_brief: Ni
         metadata["market_brief"] = market_brief.to_dict()
         metadata["market_niche"] = market_brief.name
         metadata["market_score"] = market_brief.score
+    if product_concept:
+        metadata["product_concept"] = product_concept.to_dict()
+        metadata["product_name"] = product_concept.product_name
     return metadata
 
 
-def _listing_title(bundle: BundleSpec, market_brief: NicheBrief | None) -> str:
+def _listing_title(bundle: BundleSpec, market_brief: NicheBrief | None, product_concept: ProductConcept | None) -> str:
     if market_brief:
         keywords = ", ".join(market_brief.title_keywords[:3])
-        base = f"{market_brief.name} Printable Planner, {keywords}, Instant Download PDF"
+        product_name = product_concept.product_name if product_concept else market_brief.name
+        base = f"{product_name} Printable, {keywords}, Instant Download PDF"
     else:
         base = bundle.metadata.get("seo_title") or bundle.name
     return truncate_text(str(base), ETSY_TITLE_MAX_LENGTH)
 
 
-def _listing_description(bundle: BundleSpec, theme: Theme, market_brief: NicheBrief | None) -> str:
+def _listing_description(bundle: BundleSpec, theme: Theme, market_brief: NicheBrief | None, product_concept: ProductConcept | None) -> str:
     included = ", ".join(bundle.metadata.get("included_pages", []))
+    if product_concept:
+        included = ", ".join(product_concept.included_page_titles)
     details: List[str] = [
-        _market_positioning(bundle, market_brief),
+        _market_positioning(bundle, market_brief, product_concept),
         "",
         "Printable digital planner bundle.",
         f"Theme: {theme.name}.",
     ]
+    if product_concept:
+        details.append(product_concept.promise)
+        details.append(f"Designed for: {product_concept.buyer_persona}.")
+        details.append(f"Product angle: {product_concept.listing_angle}.")
     if market_brief:
         details.extend(market_brief.description_hooks)
         details.append(f"Niche focus: {market_brief.angle}.")
@@ -77,8 +87,10 @@ def _listing_description(bundle: BundleSpec, theme: Theme, market_brief: NicheBr
     return truncate_text("\n".join(details).strip(), ETSY_DESCRIPTION_MAX_LENGTH)
 
 
-def _market_positioning(bundle: BundleSpec, market_brief: NicheBrief | None) -> str:
+def _market_positioning(bundle: BundleSpec, market_brief: NicheBrief | None, product_concept: ProductConcept | None) -> str:
     if not market_brief:
         return bundle.description
+    if product_concept:
+        return f"{product_concept.product_name} printable planner bundle for {product_concept.buyer_persona}, built around {market_brief.angle}."
     audience = f" for {market_brief.audience}" if market_brief.audience else ""
     return f"{market_brief.name} printable planner bundle{audience}, built around {market_brief.angle}."
