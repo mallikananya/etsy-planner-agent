@@ -6,6 +6,7 @@ from pathlib import Path
 from planner_generator.bundle_builder.batch import build_all
 from planner_generator.exports.bundle_exporter import export_bundle
 from planner_generator.etsy_integration.client import EtsyDraftClient
+from planner_generator.etsy_integration.submission import submit_etsy_draft
 from planner_generator.rendering.page_renderer import render_page_to_pdf
 from planner_generator.planner_specs.loader import load_page_spec
 from planner_generator.theme_engine.loader import load_theme
@@ -42,6 +43,11 @@ def main() -> None:
     etsy_parser.add_argument("--manifest", required=True)
     etsy_parser.add_argument("--output", default=None, help="Directory for the draft payload JSON.")
 
+    etsy_submit_parser = subparsers.add_parser("submit-etsy-draft", help="Submit or dry-run an Etsy draft payload.")
+    etsy_submit_parser.add_argument("--payload", required=True, help="Path to etsy_draft_payload.json.")
+    etsy_submit_parser.add_argument("--output", default=None, help="Directory for the submission report JSON.")
+    etsy_submit_parser.add_argument("--mode", choices=["dry-run", "live"], default="dry-run")
+
     args = parser.parse_args()
 
     if args.command == "build-page":
@@ -64,6 +70,14 @@ def main() -> None:
         print("Prepared Etsy draft payload for manual review.")
         print(f"Payload: {result.output_path}")
         print("No Etsy API call was made and nothing was published.")
+    elif args.command == "submit-etsy-draft":
+        output_dir = args.output or str(Path(args.payload).parent)
+        result = submit_etsy_draft(args.payload, output_dir, mode=args.mode)
+        print(f"Wrote Etsy submission report to {result.output_path}")
+        if args.mode == "dry-run":
+            print("Dry run only. No Etsy API call was made.")
+        else:
+            print("Live mode created a draft listing only. Nothing was published.")
 
 
 if __name__ == "__main__":
