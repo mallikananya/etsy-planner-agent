@@ -109,6 +109,15 @@ python -m planner_generator.cli.main submit-etsy-draft \
 
 Live mode is intentionally a separate explicit step and requires Etsy environment variables. It creates a draft listing only; image and digital file uploads remain pending in the submission report and publishing is never automatic.
 
+## Etsy Preflight
+
+Before live draft submission, validate credentials, payload shape, upload counts, and local files:
+
+```bash
+python -m planner_generator.cli.main etsy-preflight \
+  --payload output/wellness_starter/listing/etsy_draft_payload.json
+```
+
 ## Connect Etsy OAuth
 
 Start the Etsy OAuth PKCE flow:

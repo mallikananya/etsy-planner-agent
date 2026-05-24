@@ -8,6 +8,7 @@ from planner_generator.bundle_builder.batch import build_all
 from planner_generator.exports.bundle_exporter import export_bundle
 from planner_generator.etsy_integration.client import EtsyDraftClient
 from planner_generator.etsy_integration.oauth import env_lines_for_tokens, finish_oauth_flow, refresh_oauth_token, start_oauth_flow
+from planner_generator.etsy_integration.preflight import run_etsy_preflight
 from planner_generator.etsy_integration.shops import env_line_for_shop, lookup_shop
 from planner_generator.etsy_integration.submission import submit_etsy_draft
 from planner_generator.etsy_integration.taxonomy import env_line_for_taxonomy, search_taxonomy_candidates, select_taxonomy
@@ -51,6 +52,10 @@ def main() -> None:
     etsy_submit_parser.add_argument("--payload", required=True, help="Path to etsy_draft_payload.json.")
     etsy_submit_parser.add_argument("--output", default=None, help="Directory for the submission report JSON.")
     etsy_submit_parser.add_argument("--mode", choices=["dry-run", "live"], default="dry-run")
+
+    etsy_preflight_parser = subparsers.add_parser("etsy-preflight", help="Validate an Etsy draft payload before live submission.")
+    etsy_preflight_parser.add_argument("--payload", required=True, help="Path to etsy_draft_payload.json.")
+    etsy_preflight_parser.add_argument("--output", default=None, help="Directory for the preflight report JSON.")
 
     auth_start_parser = subparsers.add_parser("etsy-auth-start", help="Start Etsy OAuth PKCE flow.")
     auth_start_parser.add_argument("--redirect-uri", required=True, help="Redirect URI configured in Etsy app.")
@@ -114,6 +119,15 @@ def main() -> None:
             print("Dry run only. No Etsy API call was made.")
         else:
             print("Live mode created a draft listing only. Nothing was published.")
+    elif args.command == "etsy-preflight":
+        output_dir = args.output or str(Path(args.payload).parent)
+        result = run_etsy_preflight(args.payload, output_dir)
+        print(f"Wrote Etsy preflight report to {result.output_path}")
+        print(f"Ready for live draft: {result.report['ready_for_live_draft']}")
+        if result.report["errors"]:
+            print("Errors:")
+            for error in result.report["errors"]:
+                print(f"- {error}")
     elif args.command == "etsy-auth-start":
         api_key = args.api_key or os.environ.get("ETSY_API_KEY", "")
         result = start_oauth_flow(api_key=api_key, redirect_uri=args.redirect_uri, state_path=args.state_path)
