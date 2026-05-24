@@ -3,16 +3,22 @@ from __future__ import annotations
 from typing import Dict, List
 
 from planner_generator.listing_assets.constraints import ETSY_DESCRIPTION_MAX_LENGTH, ETSY_TITLE_MAX_LENGTH, truncate_text
-from planner_generator.market_intelligence.models import NicheBrief, ProductConcept
+from planner_generator.market_intelligence.models import DifferentiationBrief, NicheBrief, ProductConcept
 from planner_generator.planner_specs.models import BundleSpec
 from planner_generator.seo.tags import generate_tags
 from planner_generator.theme_engine.models import Theme
 
 
-def generate_listing_metadata(bundle: BundleSpec, theme: Theme, market_brief: NicheBrief | None = None, product_concept: ProductConcept | None = None) -> Dict[str, object]:
+def generate_listing_metadata(
+    bundle: BundleSpec,
+    theme: Theme,
+    market_brief: NicheBrief | None = None,
+    product_concept: ProductConcept | None = None,
+    differentiation: DifferentiationBrief | None = None,
+) -> Dict[str, object]:
     tags = generate_tags(bundle, market_brief)
     title = _listing_title(bundle, market_brief, product_concept)
-    description = _listing_description(bundle, theme, market_brief, product_concept)
+    description = _listing_description(bundle, theme, market_brief, product_concept, differentiation)
     included_pages = product_concept.included_page_titles if product_concept else [str(page) for page in bundle.metadata.get("included_pages", [])]
     metadata: Dict[str, object] = {
         "title": title,
@@ -42,6 +48,8 @@ def generate_listing_metadata(bundle: BundleSpec, theme: Theme, market_brief: Ni
     if product_concept:
         metadata["product_concept"] = product_concept.to_dict()
         metadata["product_name"] = product_concept.product_name
+    if differentiation:
+        metadata["differentiation_brief"] = differentiation.to_dict()
     return metadata
 
 
@@ -55,7 +63,13 @@ def _listing_title(bundle: BundleSpec, market_brief: NicheBrief | None, product_
     return truncate_text(str(base), ETSY_TITLE_MAX_LENGTH)
 
 
-def _listing_description(bundle: BundleSpec, theme: Theme, market_brief: NicheBrief | None, product_concept: ProductConcept | None) -> str:
+def _listing_description(
+    bundle: BundleSpec,
+    theme: Theme,
+    market_brief: NicheBrief | None,
+    product_concept: ProductConcept | None,
+    differentiation: DifferentiationBrief | None,
+) -> str:
     included = ", ".join(bundle.metadata.get("included_pages", []))
     if product_concept:
         included = ", ".join(product_concept.included_page_titles)
@@ -69,6 +83,8 @@ def _listing_description(bundle: BundleSpec, theme: Theme, market_brief: NicheBr
         details.append(product_concept.promise)
         details.append(f"Designed for: {product_concept.buyer_persona}.")
         details.append(f"Product angle: {product_concept.listing_angle}.")
+    if differentiation:
+        details.append(f"Why this planner is different: {differentiation.differentiators[0]}")
     if market_brief:
         details.extend(market_brief.description_hooks)
         details.append(f"Niche focus: {market_brief.angle}.")

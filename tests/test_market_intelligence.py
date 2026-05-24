@@ -1,12 +1,15 @@
 from pathlib import Path
 import json
 
+from planner_generator.bundle_builder.variations import build_variation_set
 from planner_generator.exports.bundle_exporter import export_bundle
 from planner_generator.market_intelligence.concepts import build_product_concept
+from planner_generator.market_intelligence.differentiation import build_differentiation_brief
 from planner_generator.market_intelligence.discovery import extract_etsy_related_phrases
 from planner_generator.market_intelligence.models import MarketSignal
 from planner_generator.market_intelligence.page_selection import product_concept_with_pages, select_concept_pages
 from planner_generator.market_intelligence.signals import build_market_brief, load_market_signals
+from planner_generator.market_intelligence.variations import build_bundle_variations
 from planner_generator.planner_specs.loader import load_bundle_spec, load_page_spec
 from planner_generator.theme_engine.loader import load_theme
 
@@ -46,6 +49,10 @@ def test_market_brief_selects_best_live_signal_without_fixed_categories():
     assert "protect energy" in concept.promise
     assert "energy tracking" in concept.page_strategy
 
+    differentiation = build_differentiation_brief(brief, concept)
+    assert "not a generic printable planner" in differentiation.position
+    assert any("low-energy" in item for item in differentiation.differentiators)
+
 
 def test_market_signals_file_drives_listing_metadata_and_mockup(tmp_path):
     signal_path = tmp_path / "signals.json"
@@ -83,6 +90,8 @@ def test_market_signals_file_drives_listing_metadata_and_mockup(tmp_path):
     assert "corporate girl" in metadata["tags"]
     assert "corporate girl reset" in metadata["title"].lower()
     assert "product_concept" in manifest
+    assert "differentiation_brief" in manifest
+    assert "differentiation_brief" in metadata
     assert "work week" in metadata["description"].lower()
     assert manifest["market_brief"]["visual_keywords"][:3] == ["desk setup", "laptop", "coffee"]
     assert "budget_snapshot" in manifest["product_concept"]["selected_page_ids"]
@@ -132,3 +141,40 @@ def test_discovery_parser_extracts_planner_related_search_phrases():
     assert "burnout recovery planner" in phrases
     assert "corporate girl reset planner" in phrases
     assert "unrelated necklace" not in phrases
+
+
+def test_bundle_variation_builder_ranks_theme_and_niche_combinations():
+    bundle = load_bundle_spec(ROOT / "specs/bundles/wellness_starter.json")
+    pages = [load_page_spec(path) for path in sorted((ROOT / "specs/pages").glob("*.json"))]
+    signals = [
+        MarketSignal(phrase="burnout recovery planner", score=4, search_volume=1800, growth=1.2, competition=20),
+        MarketSignal(phrase="corporate girl reset", score=3, search_volume=1700, growth=1.1, competition=30),
+    ]
+
+    variations = build_bundle_variations(bundle, pages, signals, theme_ids=["soft_feminine", "muted_luxury"], max_variations=2)
+
+    assert len(variations) == 2
+    assert variations[0].score >= variations[1].score
+    assert variations[0].differentiation.differentiators
+    assert {variation.theme_id for variation in variations} <= {"soft_feminine", "muted_luxury"}
+
+
+def test_build_variation_set_exports_ranked_variation_manifests(tmp_path):
+    signals = [
+        MarketSignal(phrase="burnout recovery planner", score=4, search_volume=1800, growth=1.2, competition=20),
+        MarketSignal(phrase="corporate girl reset", score=3, search_volume=1700, growth=1.1, competition=30),
+    ]
+
+    result = build_variation_set(
+        ROOT / "specs/bundles/wellness_starter.json",
+        ROOT / "themes",
+        tmp_path / "variations",
+        signals,
+        max_variations=2,
+    )
+
+    manifest = json.loads(result.manifest_path.read_text(encoding="utf-8"))
+    assert manifest["variation_count"] == 2
+    assert len(result.items) == 2
+    assert result.items[0].result.manifest_path.exists()
+    assert manifest["items"][0]["variation"]["differentiation"]["position"]

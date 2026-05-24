@@ -101,6 +101,50 @@ class ProductConcept:
         }
 
 
+@dataclass(frozen=True)
+class DifferentiationBrief:
+    position: str
+    target_buyer: str
+    crowded_market_risks: List[str]
+    differentiators: List[str]
+    proof_points: List[str]
+    seo_angle: str
+    mockup_direction: str
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "position": self.position,
+            "target_buyer": self.target_buyer,
+            "crowded_market_risks": self.crowded_market_risks,
+            "differentiators": self.differentiators,
+            "proof_points": self.proof_points,
+            "seo_angle": self.seo_angle,
+            "mockup_direction": self.mockup_direction,
+        }
+
+
+@dataclass(frozen=True)
+class BundleVariation:
+    id: str
+    rank: int
+    score: float
+    theme_id: str
+    niche: NicheBrief
+    product_concept: ProductConcept
+    differentiation: DifferentiationBrief
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "id": self.id,
+            "rank": self.rank,
+            "score": self.score,
+            "theme_id": self.theme_id,
+            "niche": self.niche.to_dict(),
+            "product_concept": self.product_concept.to_dict(),
+            "differentiation": self.differentiation.to_dict(),
+        }
+
+
 def _string_list(value: Any) -> List[str]:
     if isinstance(value, str):
         return [value]

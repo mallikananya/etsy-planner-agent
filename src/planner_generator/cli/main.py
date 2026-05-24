@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 
 from planner_generator.bundle_builder.batch import build_all
+from planner_generator.bundle_builder.variations import build_variation_set
 from planner_generator.exports.bundle_exporter import export_bundle
 from planner_generator.etsy_integration.client import EtsyDraftClient
 from planner_generator.etsy_integration.oauth import env_lines_for_tokens, finish_oauth_flow, refresh_oauth_token, start_oauth_flow
@@ -14,6 +15,7 @@ from planner_generator.etsy_integration.shops import env_line_for_shop, lookup_s
 from planner_generator.etsy_integration.submission import submit_etsy_draft
 from planner_generator.etsy_integration.taxonomy import env_line_for_taxonomy, search_taxonomy_candidates, select_taxonomy
 from planner_generator.market_intelligence.concepts import build_product_concept
+from planner_generator.market_intelligence.differentiation import build_differentiation_brief
 from planner_generator.market_intelligence.discovery import discover_market_signals
 from planner_generator.market_intelligence.signals import build_market_brief, load_market_signals
 from planner_generator.rendering.page_renderer import render_page_to_pdf
@@ -55,6 +57,14 @@ def main() -> None:
     discover_parser = subparsers.add_parser("discover-market-trends", help="Fetch public Etsy related-search signals and write them to JSON.")
     discover_parser.add_argument("--output", default="output/current_etsy_signals.json")
     discover_parser.add_argument("--max-signals", type=int, default=20)
+
+    variations_parser = subparsers.add_parser("build-bundle-variations", help="Build ranked niche/theme bundle variations from market signals.")
+    variations_parser.add_argument("--bundle", required=True)
+    variations_parser.add_argument("--themes", default="themes", help="Directory containing theme JSON files.")
+    variations_parser.add_argument("--output", default="output/variations")
+    variations_parser.add_argument("--market-signals", default=None)
+    variations_parser.add_argument("--discover-market-trends", action="store_true", help="Fetch current public Etsy related-search signals automatically.")
+    variations_parser.add_argument("--max-variations", type=int, default=4)
 
     batch_parser = subparsers.add_parser("build-all", help="Render every bundle/theme combination.")
     batch_parser.add_argument("--bundles", default="specs/bundles", help="Directory containing bundle spec JSON files.")
@@ -126,11 +136,13 @@ def main() -> None:
             raise SystemExit("Provide --market-signals or use --discover-market-trends.")
         brief = build_market_brief(bundle, signals=market_signals)
         concept = build_product_concept(brief, bundle, [])
+        differentiation = build_differentiation_brief(brief, concept)
         print(f"Selected niche: {brief.name}")
         print(f"Opportunity score: {brief.score}")
         print(f"Audience: {brief.audience}")
         print(f"Product concept: {concept.product_name}")
         print(f"Promise: {concept.promise}")
+        print(f"Differentiation: {differentiation.position}")
         print(f"Page strategy: {', '.join(concept.page_strategy)}")
         print(f"SEO tags: {', '.join(brief.seo_tags)}")
         print(f"Visual direction: {', '.join(brief.visual_keywords)}")
@@ -140,6 +152,13 @@ def main() -> None:
         output_path.parent.mkdir(parents=True, exist_ok=True)
         output_path.write_text(json.dumps({"signals": [signal.__dict__ for signal in signals]}, indent=2) + "\n", encoding="utf-8")
         print(f"Wrote {len(signals)} discovered market signals to {output_path}")
+    elif args.command == "build-bundle-variations":
+        market_signals = _market_signals_from_args(args)
+        if not market_signals:
+            raise SystemExit("Provide --market-signals or use --discover-market-trends.")
+        result = build_variation_set(args.bundle, args.themes, args.output, market_signals, max_variations=args.max_variations)
+        print(f"Wrote {len(result.items)} bundle variations to {result.output_dir}")
+        print(f"Variation manifest: {result.manifest_path}")
     elif args.command == "build-all":
         result = build_all(args.bundles, args.themes, args.output)
         print(f"Wrote {len(result.items)} bundle/theme builds to {result.output_dir}")

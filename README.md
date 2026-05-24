@@ -73,6 +73,7 @@ The bundle manifest includes explicit Etsy upload planning fields:
 - `zip_file`
 - `market_brief`
 - `product_concept`
+- `differentiation_brief`
 - `etsy_upload`
 - `file_details`
 
@@ -101,6 +102,23 @@ Preview the chosen niche and product concept:
 python -m planner_generator.cli.main analyze-market-signals \
   --bundle specs/bundles/wellness_starter.json \
   --discover-market-trends
+```
+
+Build several ranked bundle variations from the same live trend discovery. Each variation gets its own niche, theme recommendation, product concept, differentiation brief, export folder, and manifest:
+
+```bash
+python -m planner_generator.cli.main build-bundle-variations \
+  --bundle specs/bundles/wellness_starter.json \
+  --themes themes \
+  --discover-market-trends \
+  --max-variations 4 \
+  --output output/variations
+```
+
+The variation manifest is written to:
+
+```text
+output/variations/variation_manifest.json
 ```
 
 ## Build From Imported Market Signals
@@ -143,6 +161,17 @@ python -m planner_generator.cli.main build-bundle \
   --theme themes/minimal_neutral.json \
   --market-signals current_etsy_signals.json \
   --output output
+```
+
+Build ranked variations from an imported signal file:
+
+```bash
+python -m planner_generator.cli.main build-bundle-variations \
+  --bundle specs/bundles/wellness_starter.json \
+  --themes themes \
+  --market-signals current_etsy_signals.json \
+  --max-variations 4 \
+  --output output/variations
 ```
 
 ## Run Tests
