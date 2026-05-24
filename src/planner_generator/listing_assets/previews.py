@@ -5,6 +5,7 @@ from typing import List
 
 from planner_generator.layout_engine.page_layout import layout_page
 from planner_generator.layout_engine.page_sizes import get_page_size
+from planner_generator.market_intelligence.models import NicheBrief
 from planner_generator.planner_specs.models import BundleSpec, PageSpec
 from planner_generator.rendering.png_canvas import PngCanvas, hex_to_rgb
 from planner_generator.theme_engine.models import Theme
@@ -13,7 +14,7 @@ from planner_generator.theme_engine.models import Theme
 PREVIEW_PAGE_LIMIT = 8
 
 
-def write_listing_preview_assets(output_dir: str | Path, bundle: BundleSpec, theme: Theme, pages: List[PageSpec]) -> List[Path]:
+def write_listing_preview_assets(output_dir: str | Path, bundle: BundleSpec, theme: Theme, pages: List[PageSpec], market_brief: NicheBrief | None = None) -> List[Path]:
     output_dir = Path(output_dir)
     png_dir = output_dir / "previews" / "pngs"
     collage_dir = output_dir / "previews" / "collages"
@@ -28,18 +29,19 @@ def write_listing_preview_assets(output_dir: str | Path, bundle: BundleSpec, the
         generated.append(output_path)
 
     cover_path = png_dir / "00_cover.png"
-    _write_cover_png(cover_path, bundle, theme, len(pages))
+    _write_cover_png(cover_path, bundle, theme, len(pages), market_brief)
     generated.insert(0, cover_path)
 
     collage_path = collage_dir / "01_listing_collage.png"
-    _write_collage_png(collage_path, bundle, theme, preview_pages)
+    _write_collage_png(collage_path, bundle, theme, preview_pages, market_brief)
     generated.append(collage_path)
     return generated
 
 
-def _write_cover_png(path: Path, bundle: BundleSpec, theme: Theme, page_count: int) -> None:
+def _write_cover_png(path: Path, bundle: BundleSpec, theme: Theme, page_count: int, market_brief: NicheBrief | None) -> None:
     canvas = PngCanvas(1400, 1800, hex_to_rgb(theme.color("background", "#FFFFFF")))
     _draw_marketplace_background(canvas, theme)
+    _draw_niche_scene(canvas, theme, market_brief, 140, 150, 560, 190)
     _draw_product_sheet(canvas, 760, 280, 430, 610, theme, 0)
     _draw_product_sheet(canvas, 850, 420, 430, 610, theme, 1)
     canvas.rect(150, 420, 470, 30, hex_to_rgb(theme.color("heading")))
@@ -59,9 +61,10 @@ def _write_page_preview_png(path: Path, page: PageSpec, theme: Theme) -> None:
     canvas.write(path)
 
 
-def _write_collage_png(path: Path, bundle: BundleSpec, theme: Theme, pages: List[PageSpec]) -> None:
+def _write_collage_png(path: Path, bundle: BundleSpec, theme: Theme, pages: List[PageSpec], market_brief: NicheBrief | None) -> None:
     canvas = PngCanvas(2000, 1600, hex_to_rgb(theme.color("background", "#FFFFFF")))
     _draw_marketplace_background(canvas, theme)
+    _draw_niche_scene(canvas, theme, market_brief, 1320, 1260, 520, 210)
     positions = [
         (170, 230),
         (590, 170),
@@ -116,6 +119,68 @@ def _draw_product_sheet(canvas: PngCanvas, x: float, y: float, width: float, hei
     for index in range(5):
         canvas.rect(x + 48, y + 165 + index * 72, width - 96, 12, hex_to_rgb(theme.color("line")))
     canvas.rect(x + 60, y + 570, width - 120, 160, hex_to_rgb(theme.color("prompt_fill")))
+
+
+def _draw_niche_scene(canvas: PngCanvas, theme: Theme, market_brief: NicheBrief | None, x: float, y: float, width: float, height: float) -> None:
+    visuals = " ".join((market_brief.visual_keywords if market_brief else []) + (market_brief.primary_keywords if market_brief else [])).lower()
+    canvas.rect(x, y, width, height, hex_to_rgb(theme.color("section_fill")))
+    canvas.rect(x, y, width, 18, hex_to_rgb(theme.color("accent")))
+    if any(term in visuals for term in ["desk", "laptop", "work", "career", "corporate"]):
+        _draw_laptop_scene(canvas, theme, x, y, width, height)
+    elif any(term in visuals for term in ["rest", "candle", "recovery", "burnout", "calm", "bedding"]):
+        _draw_recovery_scene(canvas, theme, x, y, width, height)
+    elif any(term in visuals for term in ["budget", "receipt", "money", "savings"]):
+        _draw_budget_scene(canvas, theme, x, y, width, height)
+    elif any(term in visuals for term in ["study", "student", "academic", "course"]):
+        _draw_study_scene(canvas, theme, x, y, width, height)
+    else:
+        _draw_planner_scene(canvas, theme, x, y, width, height)
+
+
+def _draw_laptop_scene(canvas: PngCanvas, theme: Theme, x: float, y: float, width: float, height: float) -> None:
+    accent = hex_to_rgb(theme.color("accent"))
+    muted = hex_to_rgb(theme.color("muted"))
+    canvas.rect(x + width * 0.08, y + height * 0.32, width * 0.45, height * 0.36, muted)
+    canvas.rect(x + width * 0.12, y + height * 0.38, width * 0.37, height * 0.22, hex_to_rgb(theme.color("background")))
+    canvas.rect(x + width * 0.04, y + height * 0.7, width * 0.54, height * 0.06, accent)
+    canvas.rect(x + width * 0.66, y + height * 0.36, width * 0.16, height * 0.16, accent)
+    canvas.rect(x + width * 0.68, y + height * 0.52, width * 0.12, height * 0.16, muted)
+
+
+def _draw_recovery_scene(canvas: PngCanvas, theme: Theme, x: float, y: float, width: float, height: float) -> None:
+    accent = hex_to_rgb(theme.color("accent"))
+    muted = hex_to_rgb(theme.color("muted"))
+    canvas.rect(x + width * 0.08, y + height * 0.52, width * 0.58, height * 0.2, muted)
+    canvas.rect(x + width * 0.12, y + height * 0.42, width * 0.25, height * 0.12, hex_to_rgb(theme.color("prompt_fill")))
+    canvas.rect(x + width * 0.72, y + height * 0.34, width * 0.08, height * 0.28, accent)
+    canvas.rect(x + width * 0.7, y + height * 0.3, width * 0.12, height * 0.04, muted)
+
+
+def _draw_budget_scene(canvas: PngCanvas, theme: Theme, x: float, y: float, width: float, height: float) -> None:
+    accent = hex_to_rgb(theme.color("accent"))
+    line = hex_to_rgb(theme.color("line"))
+    for index in range(4):
+        canvas.rect(x + width * 0.08, y + height * (0.28 + index * 0.12), width * 0.5, height * 0.055, line)
+        canvas.rect(x + width * 0.64, y + height * (0.27 + index * 0.12), width * 0.12, height * 0.08, accent)
+    canvas.rect(x + width * 0.08, y + height * 0.75, width * 0.72, height * 0.04, accent)
+
+
+def _draw_study_scene(canvas: PngCanvas, theme: Theme, x: float, y: float, width: float, height: float) -> None:
+    accent = hex_to_rgb(theme.color("accent"))
+    muted = hex_to_rgb(theme.color("muted"))
+    canvas.rect(x + width * 0.1, y + height * 0.28, width * 0.34, height * 0.46, hex_to_rgb(theme.color("background")))
+    canvas.rect(x + width * 0.12, y + height * 0.34, width * 0.28, height * 0.035, muted)
+    canvas.rect(x + width * 0.12, y + height * 0.44, width * 0.28, height * 0.035, muted)
+    canvas.rect(x + width * 0.56, y + height * 0.34, width * 0.26, height * 0.32, accent)
+
+
+def _draw_planner_scene(canvas: PngCanvas, theme: Theme, x: float, y: float, width: float, height: float) -> None:
+    accent = hex_to_rgb(theme.color("accent"))
+    line = hex_to_rgb(theme.color("line"))
+    canvas.rect(x + width * 0.12, y + height * 0.26, width * 0.64, height * 0.5, hex_to_rgb(theme.color("background")))
+    for index in range(5):
+        canvas.rect(x + width * 0.18, y + height * (0.36 + index * 0.07), width * 0.48, height * 0.025, line)
+    canvas.rect(x + width * 0.68, y + height * 0.32, width * 0.08, height * 0.26, accent)
 
 
 def _draw_section_marks(canvas: PngCanvas, x: float, y: float, width: float, height: float, section_type: str, theme: Theme) -> None:

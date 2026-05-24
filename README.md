@@ -11,7 +11,8 @@ See [docs/PRD.md](docs/PRD.md) for the product requirements and [docs/IMPLEMENTA
 - Layout primitives separated from rendering
 - Deterministic PDF and PNG preview export using built-in Python only
 - Predictable output folders and manifests
-- Placeholder seams for listing assets, SEO, and future Etsy draft creation
+- Market-aware niche selection from live trend signal files
+- Listing assets, SEO metadata, Etsy draft payloads, and preflight checks
 
 ## Setup
 
@@ -70,8 +71,51 @@ The bundle manifest includes explicit Etsy upload planning fields:
 - `primary_customer_files`
 - `preview_files`
 - `zip_file`
+- `market_brief`
 - `etsy_upload`
 - `file_details`
+
+## Build From Live Market Signals
+
+While the Etsy API key is pending, feed the generator a JSON file from current Etsy research, ads data, keyword tools, or manual trend notes. The code ranks those signals at build time and uses the selected niche brief for the listing title, description, tags, manifest, and preview mockup direction.
+
+```json
+{
+  "signals": [
+    {
+      "phrase": "corporate girl reset",
+      "source": "etsy_search",
+      "score": 4,
+      "search_volume": 2200,
+      "growth": 1.1,
+      "competition": 30,
+      "conversion_intent": 1.5,
+      "keywords": ["corporate girl", "work reset", "career planner"],
+      "buyer_phrases": ["corporate girl reset planner", "work week reset printable"],
+      "visual_keywords": ["desk setup", "laptop", "coffee"],
+      "page_focus": ["weekly priorities", "habit reset", "brain dump"]
+    }
+  ]
+}
+```
+
+Preview the selected niche:
+
+```bash
+python -m planner_generator.cli.main analyze-market-signals \
+  --bundle specs/bundles/wellness_starter.json \
+  --market-signals current_etsy_signals.json
+```
+
+Build the bundle and Etsy-ready assets from those current signals:
+
+```bash
+python -m planner_generator.cli.main build-bundle \
+  --bundle specs/bundles/wellness_starter.json \
+  --theme themes/minimal_neutral.json \
+  --market-signals current_etsy_signals.json \
+  --output output
+```
 
 ## Run Tests
 
@@ -168,6 +212,7 @@ layout_engine      Page sizing, margins, and section placement
 rendering          Deterministic drawing primitives and PDF output
 exports            Customer-facing file generation
 packaging          ZIP assembly and bundle manifests
+market_intelligence Live trend signal ranking and niche brief creation
 listing_assets     Listing text and preview asset foundations
 seo                Metadata and tag generation foundations
 etsy_integration   Future draft listing API boundary

@@ -12,6 +12,8 @@ from planner_generator.etsy_integration.preflight import run_etsy_preflight
 from planner_generator.etsy_integration.shops import env_line_for_shop, lookup_shop
 from planner_generator.etsy_integration.submission import submit_etsy_draft
 from planner_generator.etsy_integration.taxonomy import env_line_for_taxonomy, search_taxonomy_candidates, select_taxonomy
+from planner_generator.market_intelligence.signals import build_market_brief, load_market_signals
+from planner_generator.planner_specs.loader import load_bundle_spec
 from planner_generator.rendering.page_renderer import render_page_to_pdf
 from planner_generator.planner_specs.loader import load_page_spec
 from planner_generator.theme_engine.loader import load_theme
@@ -33,11 +35,17 @@ def main() -> None:
     bundle_parser.add_argument("--bundle", required=True, help="Path to a bundle spec JSON file.")
     bundle_parser.add_argument("--theme", required=True, help="Path to a theme JSON file.")
     bundle_parser.add_argument("--output", default="output", help="Output root directory.")
+    bundle_parser.add_argument("--market-signals", default=None, help="JSON file of live market trend signals to rank for this product.")
 
     listing_parser = subparsers.add_parser("generate-listing-assets", help="Generate listing assets through the bundle export pipeline.")
     listing_parser.add_argument("--bundle", required=True)
     listing_parser.add_argument("--theme", required=True)
     listing_parser.add_argument("--output", default="output")
+    listing_parser.add_argument("--market-signals", default=None, help="JSON file of live market trend signals to rank for this product.")
+
+    market_parser = subparsers.add_parser("analyze-market-signals", help="Rank live trend signals and print the selected planner niche brief.")
+    market_parser.add_argument("--bundle", required=True)
+    market_parser.add_argument("--market-signals", required=True)
 
     batch_parser = subparsers.add_parser("build-all", help="Render every bundle/theme combination.")
     batch_parser.add_argument("--bundles", default="specs/bundles", help="Directory containing bundle spec JSON files.")
@@ -98,9 +106,19 @@ def main() -> None:
         print(f"Wrote {Path(args.output)}")
     elif args.command in {"build-bundle", "generate-listing-assets"}:
         theme = load_theme(args.theme)
-        result = export_bundle(args.bundle, theme, args.output)
+        market_signals = load_market_signals(args.market_signals) if args.market_signals else None
+        result = export_bundle(args.bundle, theme, args.output, market_signals=market_signals)
         print(f"Wrote bundle output to {result.output_dir}")
         print(f"Manifest: {result.manifest_path}")
+    elif args.command == "analyze-market-signals":
+        bundle = load_bundle_spec(args.bundle)
+        market_signals = load_market_signals(args.market_signals)
+        brief = build_market_brief(bundle, signals=market_signals)
+        print(f"Selected niche: {brief.name}")
+        print(f"Opportunity score: {brief.score}")
+        print(f"Audience: {brief.audience}")
+        print(f"SEO tags: {', '.join(brief.seo_tags)}")
+        print(f"Visual direction: {', '.join(brief.visual_keywords)}")
     elif args.command == "build-all":
         result = build_all(args.bundles, args.themes, args.output)
         print(f"Wrote {len(result.items)} bundle/theme builds to {result.output_dir}")

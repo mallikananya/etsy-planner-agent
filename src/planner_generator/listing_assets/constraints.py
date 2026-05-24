@@ -14,7 +14,9 @@ def truncate_text(value: str, max_length: int) -> str:
     value = value.strip()
     if len(value) <= max_length:
         return value
-    return value[: max_length - 1].rstrip() + "..."
+    if max_length <= 3:
+        return value[:max_length]
+    return value[: max_length - 3].rstrip() + "..."
 
 
 def normalize_tag(value: str) -> str:

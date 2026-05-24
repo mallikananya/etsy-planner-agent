@@ -8,6 +8,8 @@ from typing import Dict, List
 
 from planner_generator.listing_assets.constraints import ETSY_DIGITAL_FILE_MAX_COUNT, ETSY_LISTING_IMAGE_MAX_COUNT
 from planner_generator.listing_assets.metadata import generate_listing_metadata
+from planner_generator.market_intelligence.models import MarketSignal, NicheBrief
+from planner_generator.market_intelligence.signals import build_market_brief
 from planner_generator.packaging.zipper import create_customer_zip
 from planner_generator.planner_specs.loader import load_bundle_spec, load_page_spec
 from planner_generator.planner_specs.models import BundleSpec, PageSpec
@@ -25,11 +27,12 @@ class BundleExportResult:
     generated_files: List[Path]
 
 
-def export_bundle(bundle_path: str | Path, theme: Theme, output_root: str | Path) -> BundleExportResult:
+def export_bundle(bundle_path: str | Path, theme: Theme, output_root: str | Path, market_signals: List[MarketSignal] | None = None) -> BundleExportResult:
     bundle_path = Path(bundle_path)
     bundle = load_bundle_spec(bundle_path)
     pages = _load_bundle_pages(bundle, bundle_path.parent)
     validate_page_count(bundle, pages)
+    market_brief = build_market_brief(bundle, pages, market_signals)
     output_dir = Path(output_root) / bundle.id
     if output_dir.exists():
         shutil.rmtree(output_dir)
@@ -53,19 +56,19 @@ def export_bundle(bundle_path: str | Path, theme: Theme, output_root: str | Path
 
     listing_dir = output_dir / "listing"
     listing_dir.mkdir(parents=True, exist_ok=True)
-    listing_metadata = generate_listing_metadata(bundle, theme)
+    listing_metadata = generate_listing_metadata(bundle, theme, market_brief)
     (listing_dir / "title.txt").write_text(listing_metadata["title"] + "\n", encoding="utf-8")
     (listing_dir / "description.txt").write_text(listing_metadata["description"] + "\n", encoding="utf-8")
     (listing_dir / "tags.json").write_text(json.dumps(listing_metadata["tags"], indent=2) + "\n", encoding="utf-8")
     (listing_dir / "metadata.json").write_text(json.dumps(listing_metadata, indent=2) + "\n", encoding="utf-8")
     generated_files.extend([listing_dir / "title.txt", listing_dir / "description.txt", listing_dir / "tags.json", listing_dir / "metadata.json"])
-    preview_files = write_listing_preview_assets(output_dir, bundle, theme, pages)
+    preview_files = write_listing_preview_assets(output_dir, bundle, theme, pages, market_brief)
     generated_files.extend(preview_files)
 
     zip_path = create_customer_zip(output_dir, primary_customer_files)
     generated_files.append(zip_path)
 
-    manifest = _build_manifest(bundle, theme, pages, generated_files, primary_customer_files, individual_page_files, preview_files, zip_path, output_dir)
+    manifest = _build_manifest(bundle, theme, pages, generated_files, primary_customer_files, individual_page_files, preview_files, zip_path, output_dir, market_brief)
     manifest_path = output_dir / "manifest.json"
     manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
     generated_files.append(manifest_path)
@@ -103,6 +106,7 @@ def _build_manifest(
     preview_files: List[Path],
     zip_path: Path,
     output_dir: Path,
+    market_brief: NicheBrief,
 ) -> Dict[str, object]:
     primary_customer_file_refs = [str(path.relative_to(output_dir)) for path in primary_customer_files]
     preview_file_refs = [str(path.relative_to(output_dir)) for path in preview_files]
@@ -113,6 +117,7 @@ def _build_manifest(
         "theme_name": theme.name,
         "page_count": len(pages),
         "paper_sizes": bundle.paper_sizes,
+        "market_brief": market_brief.to_dict(),
         "primary_customer_files": primary_customer_file_refs,
         "individual_page_files": [str(path.relative_to(output_dir)) for path in individual_page_files],
         "preview_files": preview_file_refs,

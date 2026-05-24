@@ -3,17 +3,18 @@ from __future__ import annotations
 from typing import Dict, List
 
 from planner_generator.listing_assets.constraints import ETSY_DESCRIPTION_MAX_LENGTH, ETSY_TITLE_MAX_LENGTH, truncate_text
+from planner_generator.market_intelligence.models import NicheBrief
 from planner_generator.planner_specs.models import BundleSpec
 from planner_generator.seo.tags import generate_tags
 from planner_generator.theme_engine.models import Theme
 
 
-def generate_listing_metadata(bundle: BundleSpec, theme: Theme) -> Dict[str, object]:
-    tags = generate_tags(bundle)
-    title = _listing_title(bundle)
-    description = _listing_description(bundle, theme)
+def generate_listing_metadata(bundle: BundleSpec, theme: Theme, market_brief: NicheBrief | None = None) -> Dict[str, object]:
+    tags = generate_tags(bundle, market_brief)
+    title = _listing_title(bundle, market_brief)
+    description = _listing_description(bundle, theme, market_brief)
     included_pages = [str(page) for page in bundle.metadata.get("included_pages", [])]
-    return {
+    metadata: Dict[str, object] = {
         "title": title,
         "description": description,
         "tags": tags,
@@ -34,21 +35,35 @@ def generate_listing_metadata(bundle: BundleSpec, theme: Theme) -> Dict[str, obj
             "tag_max_length": 20,
         },
     }
+    if market_brief:
+        metadata["market_brief"] = market_brief.to_dict()
+        metadata["market_niche"] = market_brief.name
+        metadata["market_score"] = market_brief.score
+    return metadata
 
 
-def _listing_title(bundle: BundleSpec) -> str:
-    base = bundle.metadata.get("seo_title") or bundle.name
+def _listing_title(bundle: BundleSpec, market_brief: NicheBrief | None) -> str:
+    if market_brief:
+        keywords = ", ".join(market_brief.title_keywords[:3])
+        base = f"{market_brief.name} Printable Planner, {keywords}, Instant Download PDF"
+    else:
+        base = bundle.metadata.get("seo_title") or bundle.name
     return truncate_text(str(base), ETSY_TITLE_MAX_LENGTH)
 
 
-def _listing_description(bundle: BundleSpec, theme: Theme) -> str:
+def _listing_description(bundle: BundleSpec, theme: Theme, market_brief: NicheBrief | None) -> str:
     included = ", ".join(bundle.metadata.get("included_pages", []))
     details: List[str] = [
-        bundle.description,
+        _market_positioning(bundle, market_brief),
         "",
         "Printable digital planner bundle.",
         f"Theme: {theme.name}.",
     ]
+    if market_brief:
+        details.extend(market_brief.description_hooks)
+        details.append(f"Niche focus: {market_brief.angle}.")
+        if market_brief.long_tail_keywords:
+            details.append(f"Search-friendly phrases: {', '.join(market_brief.long_tail_keywords[:6])}.")
     if included:
         details.append(f"Included pages: {included}.")
     details.extend(
@@ -60,3 +75,10 @@ def _listing_description(bundle: BundleSpec, theme: Theme) -> str:
         ]
     )
     return truncate_text("\n".join(details).strip(), ETSY_DESCRIPTION_MAX_LENGTH)
+
+
+def _market_positioning(bundle: BundleSpec, market_brief: NicheBrief | None) -> str:
+    if not market_brief:
+        return bundle.description
+    audience = f" for {market_brief.audience}" if market_brief.audience else ""
+    return f"{market_brief.name} printable planner bundle{audience}, built around {market_brief.angle}."
