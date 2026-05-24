@@ -9,11 +9,20 @@ from planner_generator.theme_engine.loader import load_theme
 
 ROOT = Path(__file__).resolve().parents[1]
 COMPONENT_PAGE_IDS = [
+    "adhd_task_dump",
+    "assignment_tracker",
+    "cleaning_reset",
+    "content_planner",
+    "deadline_tracker",
     "monthly_overview",
+    "nervous_system_reset",
+    "payday_planner",
     "budget_snapshot",
     "gratitude_journal",
     "brain_dump",
     "goal_planner",
+    "sunday_reset",
+    "workout_wellness_tracker",
 ]
 
 

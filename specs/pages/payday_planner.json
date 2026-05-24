@@ -1,0 +1,40 @@
+{
+  "id": "payday_planner",
+  "page_type": "budget_planner",
+  "title": "Payday Planner",
+  "subtitle": "Give every paycheck a simple job before the money disappears.",
+  "metadata": {
+    "collection": "component_expansion",
+    "collection_label": "planner component library"
+  },
+  "sections": [
+    {
+      "id": "paycheck_plan",
+      "type": "amount_rows",
+      "title": "Paycheck Plan",
+      "weight": 1.7,
+      "fields": {
+        "rows": 9
+      }
+    },
+    {
+      "id": "must_pay",
+      "type": "checkbox_list",
+      "title": "Must Pay",
+      "weight": 0.9,
+      "fields": {
+        "items": ["Rent / mortgage", "Utilities", "Groceries", "Debt", "Savings"]
+      }
+    },
+    {
+      "id": "money_note",
+      "type": "prompt_box",
+      "title": "Money Note",
+      "weight": 0.8,
+      "fields": {
+        "prompt": "What decision would make this paycheck easier?",
+        "line_count": 4
+      }
+    }
+  ]
+}

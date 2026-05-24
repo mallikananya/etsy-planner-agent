@@ -1,0 +1,45 @@
+{
+  "id": "assignment_tracker",
+  "page_type": "student_planner",
+  "title": "Assignment Tracker",
+  "subtitle": "Track assignments, due dates, class details, status, and next study steps.",
+  "metadata": {
+    "collection": "component_expansion",
+    "collection_label": "planner component library"
+  },
+  "sections": [
+    {
+      "id": "assignments",
+      "type": "amount_rows",
+      "title": "Assignments",
+      "weight": 1.7,
+      "fields": {
+        "rows": 10,
+        "label_width": 300,
+        "amount_width": 90,
+        "total_width": 80
+      }
+    },
+    {
+      "id": "study_blocks",
+      "type": "two_column",
+      "title": "Study Blocks",
+      "weight": 1.0,
+      "fields": {
+        "left_title": "Class",
+        "right_title": "Study Task",
+        "line_count": 5
+      }
+    },
+    {
+      "id": "questions",
+      "type": "prompt_box",
+      "title": "Questions",
+      "weight": 0.7,
+      "fields": {
+        "prompt": "Questions to ask or clarify:",
+        "line_count": 4
+      }
+    }
+  ]
+}

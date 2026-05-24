@@ -1,0 +1,40 @@
+{
+  "id": "workout_wellness_tracker",
+  "page_type": "fitness_tracker",
+  "title": "Workout + Wellness Tracker",
+  "subtitle": "Track movement, recovery, energy, and small wellness habits across the week.",
+  "metadata": {
+    "collection": "component_expansion",
+    "collection_label": "planner component library"
+  },
+  "sections": [
+    {
+      "id": "movement_tracker",
+      "type": "tracker_grid",
+      "title": "Movement Tracker",
+      "weight": 1.4,
+      "fields": {
+        "rows": 6,
+        "columns": 7
+      }
+    },
+    {
+      "id": "wellness_check",
+      "type": "checkbox_list",
+      "title": "Wellness Check",
+      "weight": 1.0,
+      "fields": {
+        "items": ["Water", "Stretch", "Walk", "Strength", "Rest", "Sleep"]
+      }
+    },
+    {
+      "id": "body_notes",
+      "type": "notes_box",
+      "title": "Body Notes",
+      "weight": 0.8,
+      "fields": {
+        "line_count": 5
+      }
+    }
+  ]
+}

@@ -1,0 +1,42 @@
+{
+  "id": "deadline_tracker",
+  "page_type": "deadline_tracker",
+  "title": "Deadline Tracker",
+  "subtitle": "Map due dates, priority, status, and the next action before anything slips.",
+  "metadata": {
+    "collection": "component_expansion",
+    "collection_label": "planner component library"
+  },
+  "sections": [
+    {
+      "id": "deadline_map",
+      "type": "amount_rows",
+      "title": "Deadlines",
+      "weight": 1.8,
+      "fields": {
+        "rows": 10,
+        "label_width": 300,
+        "amount_width": 90,
+        "total_width": 80
+      }
+    },
+    {
+      "id": "urgent_next",
+      "type": "checkbox_list",
+      "title": "Next Actions",
+      "weight": 1.0,
+      "fields": {
+        "items": ["Clarify requirement", "Break into first step", "Block time", "Send update", "Submit or review"]
+      }
+    },
+    {
+      "id": "notes",
+      "type": "notes_box",
+      "title": "Notes",
+      "weight": 0.8,
+      "fields": {
+        "line_count": 4
+      }
+    }
+  ]
+}

@@ -1,0 +1,40 @@
+{
+  "id": "content_planner",
+  "page_type": "content_planner",
+  "title": "Content Planner",
+  "subtitle": "Plan content ideas, channels, captions, and next production steps.",
+  "metadata": {
+    "collection": "component_expansion",
+    "collection_label": "planner component library"
+  },
+  "sections": [
+    {
+      "id": "content_calendar",
+      "type": "calendar_grid",
+      "title": "Content Calendar",
+      "weight": 1.4,
+      "fields": {
+        "weeks": 5
+      }
+    },
+    {
+      "id": "ideas",
+      "type": "prompt_box",
+      "title": "Ideas",
+      "weight": 1.0,
+      "fields": {
+        "prompt": "Ideas to draft, film, write, or batch:",
+        "line_count": 6
+      }
+    },
+    {
+      "id": "channels",
+      "type": "checkbox_list",
+      "title": "Channels",
+      "weight": 0.7,
+      "fields": {
+        "items": ["Instagram", "TikTok", "Pinterest", "Email", "Blog", "Etsy update"]
+      }
+    }
+  ]
+}

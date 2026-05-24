@@ -167,11 +167,19 @@ def _page_focus_hints(phrase: str) -> List[str]:
     if "daily" in text:
         focus.append("daily focus")
     if "budget" in text:
-        focus.append("budget check-in")
+        focus.extend(["payday planner", "budget check-in"])
     if "habit" in text or "tracker" in text:
         focus.append("habit tracker")
     if "self care" in text or "wellness" in text or "burnout" in text:
-        focus.extend(["self-care menu", "energy tracker"])
+        focus.extend(["nervous system reset", "self-care menu", "energy tracker"])
+    if "student" in text or "assignment" in text or "study" in text:
+        focus.extend(["assignment tracker", "deadline tracker"])
+    if "adhd" in text:
+        focus.extend(["adhd task dump", "tiny next steps"])
+    if "cleaning" in text:
+        focus.append("cleaning reset")
+    if "content" in text:
+        focus.append("content planner")
     return focus or ["weekly planning"]
 
 

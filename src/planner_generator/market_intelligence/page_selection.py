@@ -50,6 +50,8 @@ def _page_score(page: PageSpec, concept: ProductConcept, niche: NicheBrief) -> f
         score += 1.5
     if page.page_type in {"notes", "brain_dump"}:
         score += 0.75
+    if page.page_type in {"deadline_tracker", "student_planner", "content_planner", "budget_planner", "wellness_reset", "home_reset", "fitness_tracker"}:
+        score += 1.0
     return score
 
 

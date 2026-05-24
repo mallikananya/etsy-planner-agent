@@ -100,7 +100,10 @@ def test_market_signals_file_drives_listing_metadata_and_listing_upgrade_path(tm
     assert "differentiation_brief" in metadata
     assert "listing_upgrade_path" in manifest
     assert "listing_upgrade_path" in metadata
+    assert "customer_objection_coverage" in metadata
     assert len(manifest["listing_upgrade_path"]["staged_upgrades"]) == 4
+    assert "Quick answers before you buy" in metadata["description"]
+    assert "not an editable Canva" in metadata["description"]
     assert "work week" in metadata["description"].lower()
     assert manifest["market_brief"]["visual_keywords"][:3] == ["desk setup", "laptop", "coffee"]
     assert "budget_snapshot" in manifest["product_concept"]["selected_page_ids"]
@@ -135,6 +138,34 @@ def test_dynamic_page_selection_adapts_pages_to_market_concept():
     assert any(page.title == "Corporate Girl Reset Weekly Reset" for page in selected)
     work_page = next(page for page in selected if page.id == "daily_reset")
     assert any(section.title == "Work Priorities" for section in work_page.sections)
+
+
+def test_dynamic_page_selection_uses_expanded_student_and_adhd_components():
+    bundle = load_bundle_spec(ROOT / "specs/bundles/wellness_starter.json")
+    candidates = [load_page_spec(path) for path in sorted((ROOT / "specs/pages").glob("*.json"))]
+    brief = build_market_brief(
+        bundle,
+        signals=[
+            MarketSignal(
+                phrase="adhd student planner",
+                score=5,
+                search_volume=2400,
+                growth=1.3,
+                competition=25,
+                keywords=["adhd task dump", "assignment tracker", "deadline tracker"],
+                buyer_phrases=["adhd student planner", "assignment tracker printable"],
+                page_focus=["assignment tracker", "adhd task dump", "deadline tracker"],
+            )
+        ],
+    )
+    concept = build_product_concept(brief, bundle, [])
+
+    selected = select_concept_pages(candidates, concept, brief, bundle, target_count=8)
+    selected_ids = {page.id for page in selected}
+
+    assert "assignment_tracker" in selected_ids
+    assert "adhd_task_dump" in selected_ids
+    assert "deadline_tracker" in selected_ids
 
 
 def test_discovery_parser_extracts_planner_related_search_phrases():

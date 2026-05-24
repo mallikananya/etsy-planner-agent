@@ -1,0 +1,41 @@
+{
+  "id": "nervous_system_reset",
+  "page_type": "wellness_reset",
+  "title": "Nervous System Reset",
+  "subtitle": "Choose grounding cues, reduce sensory load, and plan the next gentle step.",
+  "metadata": {
+    "collection": "component_expansion",
+    "collection_label": "planner component library"
+  },
+  "sections": [
+    {
+      "id": "body_check",
+      "type": "rating_scale",
+      "title": "Body Check",
+      "weight": 1.0,
+      "fields": {
+        "labels": ["Tense", "Settled"],
+        "steps": 5
+      }
+    },
+    {
+      "id": "grounding_menu",
+      "type": "checkbox_list",
+      "title": "Grounding Menu",
+      "weight": 1.2,
+      "fields": {
+        "items": ["Drink water", "Step outside", "Lower lights", "Slow exhale", "Stretch shoulders", "Text support"]
+      }
+    },
+    {
+      "id": "next_step",
+      "type": "prompt_box",
+      "title": "Next Gentle Step",
+      "weight": 0.8,
+      "fields": {
+        "prompt": "The smallest helpful next step is:",
+        "line_count": 5
+      }
+    }
+  ]
+}

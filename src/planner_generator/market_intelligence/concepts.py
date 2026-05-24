@@ -45,13 +45,21 @@ def _page_strategy(niche: NicheBrief) -> List[str]:
     text = _niche_text(niche)
     strategy: List[str] = []
     if _matches(text, ["corporate", "career", "work", "reset", "girl boss"]):
-        strategy.extend(["weekly priorities", "daily focus", "brain dump", "habit reset", "budget check-in", "notes"])
+        strategy.extend(["weekly priorities", "daily focus", "deadline tracker", "brain dump", "habit reset", "budget check-in", "notes"])
     if _matches(text, ["burnout", "recovery", "rest", "self care", "mental", "nervous"]):
-        strategy.extend(["energy tracking", "gentle daily reset", "self-care menu", "evening reflection", "brain dump", "gratitude"])
+        strategy.extend(["energy tracking", "nervous system reset", "gentle daily reset", "self-care menu", "evening reflection", "brain dump", "gratitude"])
     if _matches(text, ["budget", "money", "finance", "savings", "debt"]):
-        strategy.extend(["budget snapshot", "monthly overview", "goal planning", "weekly priorities", "notes"])
+        strategy.extend(["payday planner", "budget snapshot", "monthly overview", "goal planning", "weekly priorities", "notes"])
     if _matches(text, ["student", "study", "academic", "school", "course"]):
-        strategy.extend(["monthly overview", "weekly priorities", "study focus", "habit tracker", "brain dump", "notes"])
+        strategy.extend(["assignment tracker", "deadline tracker", "monthly overview", "weekly priorities", "study focus", "habit tracker", "brain dump", "notes"])
+    if _matches(text, ["adhd", "task dump", "executive", "focus"]):
+        strategy.extend(["adhd task dump", "brain dump", "deadline tracker", "daily focus", "tiny next steps"])
+    if _matches(text, ["cleaning", "home", "reset", "declutter"]):
+        strategy.extend(["cleaning reset", "sunday reset", "weekly priorities", "maintenance tracker"])
+    if _matches(text, ["content", "creator", "social", "marketing"]):
+        strategy.extend(["content planner", "monthly overview", "deadline tracker", "brain dump"])
+    if _matches(text, ["workout", "fitness", "wellness", "movement"]):
+        strategy.extend(["workout wellness tracker", "energy tracking", "habit tracker", "weekly planning"])
     strategy.extend(niche.page_focus)
     strategy.extend(["weekly planning", "daily planning", "tracking", "reflection", "notes"])
     return _unique(strategy)[:10]

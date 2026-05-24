@@ -1,0 +1,40 @@
+{
+  "id": "adhd_task_dump",
+  "page_type": "brain_dump",
+  "title": "ADHD Task Dump",
+  "subtitle": "Get every loose task out, sort it gently, and choose the next tiny step.",
+  "metadata": {
+    "collection": "component_expansion",
+    "collection_label": "planner component library"
+  },
+  "sections": [
+    {
+      "id": "task_dump",
+      "type": "notes_box",
+      "title": "Dump Everything",
+      "weight": 1.3,
+      "fields": {
+        "line_count": 10
+      }
+    },
+    {
+      "id": "sort_tasks",
+      "type": "quadrant_board",
+      "title": "Sort",
+      "weight": 1.2,
+      "fields": {
+        "labels": ["Now", "Later", "Ask", "Delete"],
+        "line_count": 4
+      }
+    },
+    {
+      "id": "tiny_next",
+      "type": "checkbox_list",
+      "title": "Tiny Next Steps",
+      "weight": 0.8,
+      "fields": {
+        "count": 5
+      }
+    }
+  ]
+}

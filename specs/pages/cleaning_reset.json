@@ -1,0 +1,42 @@
+{
+  "id": "cleaning_reset",
+  "page_type": "home_reset",
+  "title": "Cleaning Reset",
+  "subtitle": "Reset one space at a time with a realistic cleaning list and quick wins.",
+  "metadata": {
+    "collection": "component_expansion",
+    "collection_label": "planner component library"
+  },
+  "sections": [
+    {
+      "id": "quick_wins",
+      "type": "checkbox_list",
+      "title": "Quick Wins",
+      "weight": 1.0,
+      "fields": {
+        "items": ["Trash", "Dishes", "Laundry", "Counters", "Floors", "Reset one surface"]
+      }
+    },
+    {
+      "id": "room_plan",
+      "type": "two_column",
+      "title": "Room Plan",
+      "weight": 1.3,
+      "fields": {
+        "left_title": "Room",
+        "right_title": "Tasks",
+        "line_count": 7
+      }
+    },
+    {
+      "id": "maintenance",
+      "type": "tracker_grid",
+      "title": "Maintenance",
+      "weight": 0.9,
+      "fields": {
+        "rows": 5,
+        "columns": 7
+      }
+    }
+  ]
+}

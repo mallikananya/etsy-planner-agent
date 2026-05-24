@@ -74,8 +74,31 @@ The bundle manifest includes explicit Etsy upload planning fields:
 - `market_brief`
 - `product_concept`
 - `differentiation_brief`
+- `listing_upgrade_path`
+- `customer_objection_coverage`
 - `etsy_upload`
 - `file_details`
+
+Listing metadata also includes buyer-objection coverage for digital delivery, file type, paper sizes, printing, iPad use, editability, included pages, download access, and support guidance. These answers are inserted into the Etsy description so buyers can understand exactly what they are purchasing.
+
+The reusable page library includes niche-specific components the market selector can pull into generated bundles:
+
+```text
+adhd_task_dump
+assignment_tracker
+brain_dump
+budget_snapshot
+cleaning_reset
+content_planner
+deadline_tracker
+goal_planner
+gratitude_journal
+monthly_overview
+nervous_system_reset
+payday_planner
+sunday_reset
+workout_wellness_tracker
+```
 
 ## Build From Current Etsy Trend Signals
 

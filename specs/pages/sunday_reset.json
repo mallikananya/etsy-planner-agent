@@ -1,0 +1,42 @@
+{
+  "id": "sunday_reset",
+  "page_type": "weekly_planner",
+  "title": "Sunday Reset",
+  "subtitle": "Reset the week with priorities, prep, care, and a realistic first step.",
+  "metadata": {
+    "collection": "component_expansion",
+    "collection_label": "planner component library"
+  },
+  "sections": [
+    {
+      "id": "weekly_priorities",
+      "type": "checkbox_list",
+      "title": "This Week",
+      "weight": 1.0,
+      "fields": {
+        "items": ["Top priority", "One appointment", "One admin task", "One care anchor", "One thing to simplify"]
+      }
+    },
+    {
+      "id": "prep_blocks",
+      "type": "two_column",
+      "title": "Prep",
+      "weight": 1.2,
+      "fields": {
+        "left_title": "Home",
+        "right_title": "Work / School",
+        "line_count": 6
+      }
+    },
+    {
+      "id": "reset_notes",
+      "type": "prompt_box",
+      "title": "Reset Notes",
+      "weight": 0.8,
+      "fields": {
+        "prompt": "What would make this week feel lighter?",
+        "line_count": 5
+      }
+    }
+  ]
+}
