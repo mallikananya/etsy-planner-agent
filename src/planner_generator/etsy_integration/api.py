@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import urllib.error
+import urllib.parse
 import urllib.request
 from dataclasses import dataclass
 from typing import Dict, Protocol
@@ -11,6 +12,9 @@ from planner_generator.etsy_integration.config import EtsyApiConfig
 
 class EtsyTransport(Protocol):
     def post_json(self, url: str, headers: Dict[str, str], payload: Dict[str, object]) -> Dict[str, object]:
+        ...
+
+    def post_form(self, url: str, headers: Dict[str, str], payload: Dict[str, str]) -> Dict[str, object]:
         ...
 
 
@@ -25,6 +29,17 @@ class UrllibEtsyTransport:
         except urllib.error.HTTPError as error:
             body = error.read().decode("utf-8", errors="replace")
             raise RuntimeError(f"Etsy API request failed with status {error.code}: {body}") from error
+
+    def post_form(self, url: str, headers: Dict[str, str], payload: Dict[str, str]) -> Dict[str, object]:
+        data = urllib.parse.urlencode(payload).encode("utf-8")
+        request = urllib.request.Request(url=url, data=data, headers=headers, method="POST")
+        try:
+            with urllib.request.urlopen(request, timeout=30) as response:
+                body = response.read().decode("utf-8")
+                return json.loads(body) if body else {}
+        except urllib.error.HTTPError as error:
+            body = error.read().decode("utf-8", errors="replace")
+            raise RuntimeError(f"Etsy OAuth request failed with status {error.code}: {body}") from error
 
 
 @dataclass(frozen=True)

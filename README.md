@@ -109,6 +109,30 @@ python -m planner_generator.cli.main submit-etsy-draft \
 
 Live mode is intentionally a separate explicit step and requires Etsy environment variables. It creates a draft listing only; image and digital file uploads remain pending in the submission report and publishing is never automatic.
 
+## Connect Etsy OAuth
+
+Start the Etsy OAuth PKCE flow:
+
+```bash
+python -m planner_generator.cli.main etsy-auth-start \
+  --redirect-uri "http://localhost:8080/callback"
+```
+
+Open the printed URL, approve access, and copy the `code` query parameter from Etsy's redirect URL. Then finish the flow:
+
+```bash
+python -m planner_generator.cli.main etsy-auth-finish \
+  --code "PASTE_RETURNED_CODE"
+```
+
+The command writes tokens under `.etsy/` and prints `.env` lines to add locally. `.etsy/` and `.env` are ignored by git.
+
+Refresh an access token:
+
+```bash
+python -m planner_generator.cli.main etsy-auth-refresh
+```
+
 ## Architecture
 
 ```text

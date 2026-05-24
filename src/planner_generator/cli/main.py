@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import os
 import argparse
 from pathlib import Path
 
 from planner_generator.bundle_builder.batch import build_all
 from planner_generator.exports.bundle_exporter import export_bundle
 from planner_generator.etsy_integration.client import EtsyDraftClient
+from planner_generator.etsy_integration.oauth import env_lines_for_tokens, finish_oauth_flow, refresh_oauth_token, start_oauth_flow
 from planner_generator.etsy_integration.submission import submit_etsy_draft
 from planner_generator.rendering.page_renderer import render_page_to_pdf
 from planner_generator.planner_specs.loader import load_page_spec
@@ -48,6 +50,21 @@ def main() -> None:
     etsy_submit_parser.add_argument("--output", default=None, help="Directory for the submission report JSON.")
     etsy_submit_parser.add_argument("--mode", choices=["dry-run", "live"], default="dry-run")
 
+    auth_start_parser = subparsers.add_parser("etsy-auth-start", help="Start Etsy OAuth PKCE flow.")
+    auth_start_parser.add_argument("--redirect-uri", required=True, help="Redirect URI configured in Etsy app.")
+    auth_start_parser.add_argument("--api-key", default=None, help="Etsy API key. Defaults to ETSY_API_KEY.")
+    auth_start_parser.add_argument("--state-path", default=".etsy/oauth_state.json")
+
+    auth_finish_parser = subparsers.add_parser("etsy-auth-finish", help="Finish Etsy OAuth PKCE flow with returned code.")
+    auth_finish_parser.add_argument("--code", required=True, help="Authorization code from Etsy redirect.")
+    auth_finish_parser.add_argument("--state-path", default=".etsy/oauth_state.json")
+    auth_finish_parser.add_argument("--output", default=".etsy/oauth_tokens.json")
+
+    auth_refresh_parser = subparsers.add_parser("etsy-auth-refresh", help="Refresh Etsy OAuth access token.")
+    auth_refresh_parser.add_argument("--api-key", default=None, help="Etsy API key. Defaults to ETSY_API_KEY.")
+    auth_refresh_parser.add_argument("--refresh-token", default=None, help="Refresh token. Defaults to ETSY_REFRESH_TOKEN.")
+    auth_refresh_parser.add_argument("--output", default=".etsy/oauth_tokens.json")
+
     args = parser.parse_args()
 
     if args.command == "build-page":
@@ -78,6 +95,26 @@ def main() -> None:
             print("Dry run only. No Etsy API call was made.")
         else:
             print("Live mode created a draft listing only. Nothing was published.")
+    elif args.command == "etsy-auth-start":
+        api_key = args.api_key or os.environ.get("ETSY_API_KEY", "")
+        result = start_oauth_flow(api_key=api_key, redirect_uri=args.redirect_uri, state_path=args.state_path)
+        print(f"Wrote OAuth state to {result.state_path}")
+        print("Open this URL in your browser:")
+        print(result.authorization_url)
+    elif args.command == "etsy-auth-finish":
+        result = finish_oauth_flow(code=args.code, state_path=args.state_path, output_path=args.output)
+        print(f"Wrote OAuth tokens to {result.output_path}")
+        print("Add or update these lines in your local .env:")
+        for line in env_lines_for_tokens(result.tokens):
+            print(line)
+    elif args.command == "etsy-auth-refresh":
+        api_key = args.api_key or os.environ.get("ETSY_API_KEY", "")
+        refresh_token = args.refresh_token or os.environ.get("ETSY_REFRESH_TOKEN", "")
+        result = refresh_oauth_token(api_key=api_key, refresh_token=refresh_token, output_path=args.output)
+        print(f"Wrote refreshed OAuth tokens to {result.output_path}")
+        print("Add or update these lines in your local .env:")
+        for line in env_lines_for_tokens(result.tokens):
+            print(line)
 
 
 if __name__ == "__main__":
