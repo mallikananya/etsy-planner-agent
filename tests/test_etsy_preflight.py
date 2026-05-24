@@ -23,6 +23,16 @@ def test_etsy_preflight_passes_for_complete_payload(tmp_path):
     assert result.report["auto_publish"] is False
 
 
+def test_etsy_preflight_accepts_generated_payload_price_without_config_price(tmp_path):
+    payload_path = _draft_payload_path(tmp_path)
+    config = EtsyApiConfig("api-key", "access-token", "42", "1234", "", 999)
+
+    result = run_etsy_preflight(payload_path, tmp_path / "preflight", config=config)
+
+    assert result.report["ready_for_live_draft"] is True
+    assert not any("price" in error.lower() for error in result.report["errors"])
+
+
 def test_etsy_preflight_reports_missing_config_and_files(tmp_path):
     payload_path = _draft_payload_path(tmp_path)
     payload = json.loads(payload_path.read_text(encoding="utf-8"))

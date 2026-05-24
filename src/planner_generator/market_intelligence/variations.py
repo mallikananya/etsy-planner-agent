@@ -6,6 +6,7 @@ from typing import Iterable, List
 from planner_generator.market_intelligence.concepts import build_product_concept
 from planner_generator.market_intelligence.differentiation import build_differentiation_brief
 from planner_generator.market_intelligence.listing_upgrades import build_listing_upgrade_path
+from planner_generator.market_intelligence.pricing import build_pricing_strategy
 from planner_generator.market_intelligence.models import BundleVariation, MarketSignal
 from planner_generator.market_intelligence.signals import build_market_brief
 from planner_generator.planner_specs.models import BundleSpec, PageSpec
@@ -28,6 +29,7 @@ def build_bundle_variations(
     theme_ids: Iterable[str] | None = None,
     max_variations: int = 6,
 ) -> List[BundleVariation]:
+    page_list = list(pages)
     ranked_signals = _rank_signals(signals)
     themes = list(theme_ids or DEFAULT_VARIATION_THEMES)
     if not themes:
@@ -35,12 +37,13 @@ def build_bundle_variations(
 
     variations: List[BundleVariation] = []
     for index, signal in enumerate(ranked_signals[:max_variations], start=1):
-        niche = build_market_brief(bundle, pages, [signal])
+        niche = build_market_brief(bundle, page_list, [signal])
         theme_id = _choose_theme(signal.phrase, themes, index)
         niche = _theme_niche(niche, theme_id)
-        concept = build_product_concept(niche, bundle, pages)
+        concept = build_product_concept(niche, bundle, page_list)
         differentiation = build_differentiation_brief(niche, concept)
         upgrade_path = build_listing_upgrade_path(niche, concept, differentiation)
+        pricing = build_pricing_strategy(niche, concept, differentiation, page_count=len(page_list))
         variations.append(
             BundleVariation(
                 id=f"{index:02d}_{niche.slug}_{theme_id}",
@@ -51,6 +54,7 @@ def build_bundle_variations(
                 product_concept=concept,
                 differentiation=differentiation,
                 listing_upgrade_path=upgrade_path,
+                pricing_strategy=pricing,
             )
         )
     return sorted(variations, key=lambda variation: variation.score, reverse=True)

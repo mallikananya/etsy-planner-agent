@@ -40,17 +40,19 @@ class EtsyApiConfig:
             headers["Content-Type"] = content_type
         return headers
 
-    def missing_fields(self) -> List[str]:
+    def missing_fields(self, require_price: bool = True) -> List[str]:
         missing: List[str] = []
-        for field_name in ["api_key", "access_token", "shop_id", "taxonomy_id", "price"]:
+        for field_name in ["api_key", "access_token", "shop_id", "taxonomy_id"]:
             if not getattr(self, field_name):
                 missing.append(field_name)
+        if require_price and not self.price:
+            missing.append("price")
         if self.quantity < 1:
             missing.append("quantity")
         return missing
 
-    def validate_for_live_submission(self) -> None:
-        missing = self.missing_fields()
+    def validate_for_live_submission(self, require_price: bool = True) -> None:
+        missing = self.missing_fields(require_price=require_price)
         if missing:
             formatted = ", ".join(missing)
             raise ValueError(f"Missing Etsy API configuration for live submission: {formatted}")

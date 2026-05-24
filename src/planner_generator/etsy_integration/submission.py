@@ -52,7 +52,8 @@ def _dry_run_report(draft_payload: Dict[str, object], config: EtsyApiConfig) -> 
         "would_create_draft_listing": True,
         "would_upload_listing_images": upload_plan.get("listing_images", []),
         "would_upload_digital_files": upload_plan.get("digital_files", []),
-        "config_missing_fields": config.missing_fields(),
+        "config_missing_fields": config.missing_fields(require_price=not bool(draft_payload.get("price"))),
+        "listing_price": config.price or draft_payload.get("price"),
         "requires_live_confirmation": True,
         "auto_publish": False,
     }

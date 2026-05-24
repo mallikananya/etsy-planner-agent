@@ -80,12 +80,12 @@ class EtsyDraftApiClient:
     transport: EtsyTransport
 
     def create_draft_listing(self, draft_payload: Dict[str, object]) -> Dict[str, object]:
-        self.config.validate_for_live_submission()
+        self.config.validate_for_live_submission(require_price=not bool(draft_payload.get("price")))
         url = f"{self.config.api_base_url}/shops/{self.config.shop_id}/listings"
         return self.transport.post_json(url, self.config.headers(), _create_listing_request(draft_payload, self.config))
 
     def upload_listing_image(self, listing_id: int | str, image_path: str | Path, rank: int = 1) -> Dict[str, object]:
-        self.config.validate_for_live_submission()
+        self.config.validate_for_live_submission(require_price=False)
         url = f"{self.config.api_base_url}/shops/{self.config.shop_id}/listings/{listing_id}/images"
         return self.transport.post_multipart(
             url,
@@ -95,7 +95,7 @@ class EtsyDraftApiClient:
         )
 
     def upload_listing_file(self, listing_id: int | str, file_path: str | Path, name: str | None = None) -> Dict[str, object]:
-        self.config.validate_for_live_submission()
+        self.config.validate_for_live_submission(require_price=False)
         path = Path(file_path)
         url = f"{self.config.api_base_url}/shops/{self.config.shop_id}/listings/{listing_id}/files"
         return self.transport.post_multipart(
@@ -113,6 +113,7 @@ class EtsyDraftApiClient:
 
 
 def _create_listing_request(draft_payload: Dict[str, object], config: EtsyApiConfig) -> Dict[str, object]:
+    price = config.price or str(draft_payload.get("price", ""))
     return {
         "title": draft_payload["title"],
         "description": draft_payload["description"],
@@ -121,7 +122,7 @@ def _create_listing_request(draft_payload: Dict[str, object], config: EtsyApiCon
         "who_made": draft_payload.get("who_made", "i_did"),
         "when_made": draft_payload.get("when_made", "made_to_order"),
         "taxonomy_id": int(config.taxonomy_id),
-        "price": config.price,
+        "price": price,
         "quantity": config.quantity,
         "type": "download",
     }

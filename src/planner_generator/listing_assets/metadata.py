@@ -4,7 +4,7 @@ from typing import Dict, List
 
 from planner_generator.listing_assets.constraints import ETSY_DESCRIPTION_MAX_LENGTH, ETSY_TITLE_MAX_LENGTH, truncate_text
 from planner_generator.listing_assets.customer_objections import build_customer_objection_coverage, objection_description_lines
-from planner_generator.market_intelligence.models import DifferentiationBrief, ListingUpgradePath, NicheBrief, ProductConcept
+from planner_generator.market_intelligence.models import DifferentiationBrief, ListingUpgradePath, NicheBrief, PricingStrategy, ProductConcept
 from planner_generator.planner_specs.models import BundleSpec
 from planner_generator.seo.tags import generate_tags
 from planner_generator.theme_engine.models import Theme
@@ -17,6 +17,7 @@ def generate_listing_metadata(
     product_concept: ProductConcept | None = None,
     differentiation: DifferentiationBrief | None = None,
     listing_upgrade_path: ListingUpgradePath | None = None,
+    pricing_strategy: PricingStrategy | None = None,
 ) -> Dict[str, object]:
     tags = generate_tags(bundle, market_brief)
     title = _listing_title(bundle, market_brief, product_concept)
@@ -56,6 +57,10 @@ def generate_listing_metadata(
         metadata["differentiation_brief"] = differentiation.to_dict()
     if listing_upgrade_path:
         metadata["listing_upgrade_path"] = listing_upgrade_path.to_dict()
+    if pricing_strategy:
+        metadata["pricing_strategy"] = pricing_strategy.to_dict()
+        metadata["recommended_price"] = pricing_strategy.recommended_price
+        metadata["launch_sale_price"] = pricing_strategy.launch_sale_price
     return metadata
 
 

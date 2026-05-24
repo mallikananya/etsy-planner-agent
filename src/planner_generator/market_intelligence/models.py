@@ -158,6 +158,48 @@ class ListingUpgradePath:
 
 
 @dataclass(frozen=True)
+class PriceOption:
+    name: str
+    price: str
+    sale_price: str
+    positioning: str
+    best_for: str
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "name": self.name,
+            "price": self.price,
+            "sale_price": self.sale_price,
+            "positioning": self.positioning,
+            "best_for": self.best_for,
+        }
+
+
+@dataclass(frozen=True)
+class PricingStrategy:
+    recommended_offer: str
+    recommended_price: str
+    launch_sale_price: str
+    anchor_price: str
+    currency: str
+    rationale: List[str]
+    price_options: List[PriceOption]
+    etsy_autofill: Dict[str, Any]
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "recommended_offer": self.recommended_offer,
+            "recommended_price": self.recommended_price,
+            "launch_sale_price": self.launch_sale_price,
+            "anchor_price": self.anchor_price,
+            "currency": self.currency,
+            "rationale": self.rationale,
+            "price_options": [option.to_dict() for option in self.price_options],
+            "etsy_autofill": self.etsy_autofill,
+        }
+
+
+@dataclass(frozen=True)
 class BundleVariation:
     id: str
     rank: int
@@ -167,6 +209,7 @@ class BundleVariation:
     product_concept: ProductConcept
     differentiation: DifferentiationBrief
     listing_upgrade_path: ListingUpgradePath
+    pricing_strategy: PricingStrategy
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -178,6 +221,7 @@ class BundleVariation:
             "product_concept": self.product_concept.to_dict(),
             "differentiation": self.differentiation.to_dict(),
             "listing_upgrade_path": self.listing_upgrade_path.to_dict(),
+            "pricing_strategy": self.pricing_strategy.to_dict(),
         }
 
 

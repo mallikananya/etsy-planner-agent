@@ -38,7 +38,7 @@ def run_etsy_preflight(
     errors: List[str] = []
     warnings: List[str] = []
 
-    _check_config(config, errors)
+    _check_config(config, payload, errors)
     _check_metadata(payload, errors)
     _check_upload_plan(payload, errors, warnings)
     file_checks = _check_files(payload, bundle_dir, errors, warnings)
@@ -58,8 +58,8 @@ def run_etsy_preflight(
     return EtsyPreflightResult(output_path=output_path, report=report)
 
 
-def _check_config(config: EtsyApiConfig, errors: List[str]) -> None:
-    missing = config.missing_fields()
+def _check_config(config: EtsyApiConfig, payload: Dict[str, object], errors: List[str]) -> None:
+    missing = config.missing_fields(require_price=not bool(payload.get("price")))
     if missing:
         errors.append(f"Missing Etsy configuration: {', '.join(missing)}")
 
@@ -68,6 +68,7 @@ def _check_metadata(payload: Dict[str, object], errors: List[str]) -> None:
     title = str(payload.get("title", ""))
     description = str(payload.get("description", ""))
     tags = [str(tag) for tag in payload.get("tags", [])]
+    price = str(payload.get("price", ""))
     if not title:
         errors.append("Missing listing title.")
     if len(title) > ETSY_TITLE_MAX_LENGTH:
@@ -80,6 +81,8 @@ def _check_metadata(payload: Dict[str, object], errors: List[str]) -> None:
         errors.append("Too many Etsy tags.")
     if any(len(tag) > ETSY_TAG_MAX_LENGTH for tag in tags):
         errors.append("One or more Etsy tags exceeds the tag length limit.")
+    if not price:
+        errors.append("Missing listing price.")
 
 
 def _check_upload_plan(payload: Dict[str, object], errors: List[str], warnings: List[str]) -> None:

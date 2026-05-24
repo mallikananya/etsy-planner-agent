@@ -100,6 +100,10 @@ def test_market_signals_file_drives_listing_metadata_and_listing_upgrade_path(tm
     assert "differentiation_brief" in metadata
     assert "listing_upgrade_path" in manifest
     assert "listing_upgrade_path" in metadata
+    assert "pricing_strategy" in manifest
+    assert "pricing_strategy" in metadata
+    assert metadata["recommended_price"]
+    assert manifest["pricing_strategy"]["etsy_autofill"]["price"] == metadata["recommended_price"]
     assert "customer_objection_coverage" in metadata
     assert len(manifest["listing_upgrade_path"]["staged_upgrades"]) == 4
     assert "Quick answers before you buy" in metadata["description"]
@@ -197,6 +201,7 @@ def test_bundle_variation_builder_ranks_theme_and_niche_combinations():
     assert variations[0].score >= variations[1].score
     assert variations[0].differentiation.differentiators
     assert variations[0].listing_upgrade_path.immediate_actions
+    assert variations[0].pricing_strategy.recommended_price
     assert {variation.theme_id for variation in variations} <= {"soft_feminine", "muted_luxury"}
 
 
@@ -220,3 +225,4 @@ def test_build_variation_set_exports_ranked_variation_manifests(tmp_path):
     assert result.items[0].result.manifest_path.exists()
     assert manifest["items"][0]["variation"]["differentiation"]["position"]
     assert manifest["items"][0]["variation"]["listing_upgrade_path"]["primary_listing_goal"]
+    assert manifest["items"][0]["variation"]["pricing_strategy"]["recommended_price"]

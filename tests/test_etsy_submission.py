@@ -74,6 +74,26 @@ def test_live_submission_uses_mocked_etsy_transport(tmp_path):
     assert result.report["uploads"]["digital_files"]
 
 
+def test_live_submission_autofills_generated_price_when_env_price_is_blank(tmp_path):
+    payload_path = _draft_payload_path(tmp_path)
+    payload = json.loads(payload_path.read_text(encoding="utf-8"))
+    assert payload["price"]
+    transport = FakeTransport()
+    config = EtsyApiConfig(
+        api_key="api-key",
+        access_token="access-token",
+        shop_id="42",
+        taxonomy_id="1234",
+        price="",
+        quantity=999,
+    )
+    client = EtsyDraftApiClient(config=config, transport=transport)
+
+    submit_etsy_draft(payload_path, tmp_path / "submission", mode="live", config=config, api_client=client)
+
+    assert transport.calls[0]["payload"]["price"] == payload["price"]
+
+
 def _draft_payload_path(tmp_path: Path) -> Path:
     theme = load_theme(ROOT / "themes/minimal_neutral.json")
     export = export_bundle(ROOT / "specs/bundles/component_showcase.json", theme, tmp_path / "export")

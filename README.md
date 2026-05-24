@@ -75,11 +75,33 @@ The bundle manifest includes explicit Etsy upload planning fields:
 - `product_concept`
 - `differentiation_brief`
 - `listing_upgrade_path`
+- `pricing_strategy`
 - `customer_objection_coverage`
 - `etsy_upload`
 - `file_details`
 
 Listing metadata also includes buyer-objection coverage for digital delivery, file type, paper sizes, printing, iPad use, editability, included pages, download access, and support guidance. These answers are inserted into the Etsy description so buyers can understand exactly what they are purchasing.
+
+Pricing strategy is generated with every bundle and variation. It includes:
+
+- Recommended offer tier: mini, full bundle, or premium bundle
+- Recommended Etsy price
+- Launch-sale price
+- Anchor price for future sale positioning
+- Mini/full/premium price options
+- Rationale tied to page count, market score, buyer persona, and positioning
+- Etsy autofill fields for `price`, `quantity`, `who_made`, `when_made`, and listing `type`
+
+You can review pricing in these generated files:
+
+```text
+output/<bundle_id>/listing/metadata.json
+output/<bundle_id>/manifest.json
+output/<bundle_id>/listing/etsy_draft_payload.json
+output/variations/variation_manifest.json
+```
+
+When `prepare-etsy-draft` creates the payload, it writes the generated recommended price into `price`. When `submit-etsy-draft --mode live` creates the Etsy draft listing, that generated `price` is sent to Etsy automatically. If you set `ETSY_PRICE` in `.env`, that value intentionally overrides the generated price.
 
 The reusable page library includes niche-specific components the market selector can pull into generated bundles:
 

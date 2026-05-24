@@ -34,6 +34,8 @@ class EtsyDraftClient:
             "description": metadata["description"],
             "tags": metadata["tags"],
             "materials": metadata.get("materials", ["PDF", "Printable planner", "Digital download"]),
+            "price": _listing_price(metadata),
+            "pricing_strategy": metadata.get("pricing_strategy", {}),
             "who_made": "i_did",
             "when_made": "made_to_order",
             "taxonomy_note": "Select the most relevant Etsy printable planner taxonomy in the seller UI.",
@@ -46,6 +48,8 @@ class EtsyDraftClient:
                 "page_count": manifest.get("page_count"),
                 "paper_sizes": manifest.get("paper_sizes", []),
                 "included_pages": metadata.get("included_pages", []),
+                "recommended_price": metadata.get("recommended_price"),
+                "launch_sale_price": metadata.get("launch_sale_price"),
             },
             "customer_files": _customer_files(manifest),
             "preview_assets": _preview_assets(manifest, bundle_dir),
@@ -86,6 +90,17 @@ def _upload_plan(manifest: Dict[str, object]) -> Dict[str, object]:
         "listing_images": [str(path) for path in manifest.get("preview_files", [])],
         "ready_for_draft": False,
     }
+
+
+def _listing_price(metadata: Dict[str, object]) -> str:
+    strategy = metadata.get("pricing_strategy", {})
+    if isinstance(strategy, dict):
+        autofill = strategy.get("etsy_autofill", {})
+        if isinstance(autofill, dict) and autofill.get("price"):
+            return str(autofill["price"])
+        if strategy.get("recommended_price"):
+            return str(strategy["recommended_price"])
+    return str(metadata.get("recommended_price", ""))
 
 
 def _review_warnings(metadata: Dict[str, object], manifest: Dict[str, object]) -> List[str]:
