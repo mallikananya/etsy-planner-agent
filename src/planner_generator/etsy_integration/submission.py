@@ -7,6 +7,7 @@ from typing import Dict, Literal
 
 from planner_generator.etsy_integration.api import EtsyDraftApiClient, UrllibEtsyTransport
 from planner_generator.etsy_integration.config import EtsyApiConfig
+from planner_generator.etsy_integration.review import build_etsy_review_handoff
 
 
 SubmissionMode = Literal["dry-run", "live"]
@@ -61,12 +62,14 @@ def _dry_run_report(draft_payload: Dict[str, object], config: EtsyApiConfig) -> 
 
 def _live_report(draft_payload: Dict[str, object], response: Dict[str, object], uploads: Dict[str, object]) -> Dict[str, object]:
     listing_id = response.get("listing_id")
+    review_handoff = build_etsy_review_handoff(draft_payload, response, uploads)
     return {
         "mode": "live",
         "created_draft_listing": bool(listing_id),
         "listing_id": listing_id,
         "etsy_response": response,
         "uploads": uploads,
+        "etsy_review_handoff": review_handoff,
         "auto_publish": False,
     }
 

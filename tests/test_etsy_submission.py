@@ -72,6 +72,15 @@ def test_live_submission_uses_mocked_etsy_transport(tmp_path):
     assert "/files" in transport.multipart_calls[-1]["url"]
     assert result.report["uploads"]["listing_images"]
     assert result.report["uploads"]["digital_files"]
+    handoff = result.report["etsy_review_handoff"]
+    assert handoff["review_surface"] == "etsy_draft_listing"
+    assert handoff["publish_policy"]["manual_publish_required"] is True
+    assert handoff["publish_policy"]["auto_publish"] is False
+    assert "title" in handoff["autofilled_fields"]
+    assert "price" in handoff["autofilled_fields"]
+    assert "digital PDF files" in handoff["autofilled_fields"]
+    assert handoff["uploaded_assets"]["listing_image_count"] == 10
+    assert handoff["uploaded_assets"]["digital_file_count"] == 2
 
 
 def test_live_submission_autofills_generated_price_when_env_price_is_blank(tmp_path):

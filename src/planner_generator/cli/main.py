@@ -184,6 +184,13 @@ def main() -> None:
             print("Dry run only. No Etsy API call was made.")
         else:
             print("Live mode created a draft listing only. Nothing was published.")
+            handoff = result.report.get("etsy_review_handoff", {})
+            if isinstance(handoff, dict):
+                if handoff.get("listing_id"):
+                    print(f"Etsy draft listing id: {handoff['listing_id']}")
+                print(str(handoff.get("open_in_etsy", "Review the draft in Etsy Shop Manager > Listings > Drafts.")))
+                print("Autofilled fields: " + ", ".join(str(field) for field in handoff.get("autofilled_fields", [])))
+                print("Final approval happens inside Etsy. Publish manually only after review.")
     elif args.command == "etsy-preflight":
         output_dir = args.output or str(Path(args.payload).parent)
         result = run_etsy_preflight(args.payload, output_dir)

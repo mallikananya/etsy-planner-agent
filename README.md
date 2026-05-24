@@ -243,7 +243,7 @@ python -m planner_generator.cli.main prepare-etsy-draft \
   --manifest output/wellness_starter/manifest.json
 ```
 
-This writes a local draft payload for manual review. It does not call Etsy, upload files, or publish anything.
+This writes a local draft payload. It does not call Etsy, upload files, or publish anything.
 
 ## Dry-Run Etsy Submission
 
@@ -253,7 +253,9 @@ python -m planner_generator.cli.main submit-etsy-draft \
   --mode dry-run
 ```
 
-Live mode is intentionally a separate explicit step and requires Etsy environment variables. It creates a draft listing only; image and digital file uploads remain pending in the submission report and publishing is never automatic.
+Live mode is intentionally a separate explicit step and requires Etsy environment variables. It creates a draft listing only, uploads the planned listing images and digital files, and writes an Etsy review handoff into `etsy_submission_report.json`.
+
+The handoff tells you to review the listing directly in Etsy Shop Manager under Listings > Drafts. The bot autofills the draft, but final approval happens in Etsy and publishing is never automatic.
 
 ## Etsy Preflight
 
