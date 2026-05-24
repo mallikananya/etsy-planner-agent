@@ -17,7 +17,7 @@ def build_differentiation_brief(niche: NicheBrief, concept: ProductConcept) -> D
         differentiators=differentiators,
         proof_points=proof_points,
         seo_angle=_seo_angle(niche, differentiators),
-        mockup_direction=_mockup_direction(niche),
+        listing_visual_direction=_listing_visual_direction(niche),
     )
 
 
@@ -41,7 +41,7 @@ def _risks(text: str) -> List[str]:
 def _differentiators(text: str, concept: ProductConcept) -> List[str]:
     differentiators = [
         f"Niche-specific page strategy: {', '.join(concept.page_strategy[:5])}.",
-        "Listing copy, tags, selected pages, and mockup direction all come from the same market brief.",
+        "Listing copy, tags, selected pages, and listing visuals all come from the same market brief.",
     ]
     if _has(text, ["burnout", "self care", "wellness"]):
         differentiators.append("Uses gentle recovery language and practical low-energy pages instead of hustle framing.")
@@ -70,10 +70,10 @@ def _seo_angle(niche: NicheBrief, differentiators: List[str]) -> str:
     return f"Lead with {niche.name}; reinforce with {tags}. Differentiator to echo in description: {differentiators[0]}"
 
 
-def _mockup_direction(niche: NicheBrief) -> str:
+def _listing_visual_direction(niche: NicheBrief) -> str:
     if niche.visual_keywords:
-        return f"Show the planner in a {', '.join(niche.visual_keywords[:4])} scene so the first listing image matches the niche."
-    return "Show the planner pages clearly with a clean desk context and readable page variety."
+        return f"Make the listing photos emphasize {', '.join(niche.visual_keywords[:4])}, with readable page details and clear niche fit."
+    return "Make the listing photos show readable page variety, the customer file contents, and the buyer outcome clearly."
 
 
 def _text(niche: NicheBrief, concept: ProductConcept) -> str:

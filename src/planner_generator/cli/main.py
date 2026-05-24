@@ -17,6 +17,7 @@ from planner_generator.etsy_integration.taxonomy import env_line_for_taxonomy, s
 from planner_generator.market_intelligence.concepts import build_product_concept
 from planner_generator.market_intelligence.differentiation import build_differentiation_brief
 from planner_generator.market_intelligence.discovery import discover_market_signals
+from planner_generator.market_intelligence.listing_upgrades import build_listing_upgrade_path
 from planner_generator.market_intelligence.signals import build_market_brief, load_market_signals
 from planner_generator.rendering.page_renderer import render_page_to_pdf
 from planner_generator.planner_specs.loader import load_bundle_spec, load_page_spec
@@ -137,12 +138,14 @@ def main() -> None:
         brief = build_market_brief(bundle, signals=market_signals)
         concept = build_product_concept(brief, bundle, [])
         differentiation = build_differentiation_brief(brief, concept)
+        upgrade_path = build_listing_upgrade_path(brief, concept, differentiation)
         print(f"Selected niche: {brief.name}")
         print(f"Opportunity score: {brief.score}")
         print(f"Audience: {brief.audience}")
         print(f"Product concept: {concept.product_name}")
         print(f"Promise: {concept.promise}")
         print(f"Differentiation: {differentiation.position}")
+        print(f"Listing upgrade goal: {upgrade_path.primary_listing_goal}")
         print(f"Page strategy: {', '.join(concept.page_strategy)}")
         print(f"SEO tags: {', '.join(brief.seo_tags)}")
         print(f"Visual direction: {', '.join(brief.visual_keywords)}")

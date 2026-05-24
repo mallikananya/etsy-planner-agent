@@ -6,6 +6,7 @@ from planner_generator.exports.bundle_exporter import export_bundle
 from planner_generator.market_intelligence.concepts import build_product_concept
 from planner_generator.market_intelligence.differentiation import build_differentiation_brief
 from planner_generator.market_intelligence.discovery import extract_etsy_related_phrases
+from planner_generator.market_intelligence.listing_upgrades import build_listing_upgrade_path
 from planner_generator.market_intelligence.models import MarketSignal
 from planner_generator.market_intelligence.page_selection import product_concept_with_pages, select_concept_pages
 from planner_generator.market_intelligence.signals import build_market_brief, load_market_signals
@@ -53,8 +54,13 @@ def test_market_brief_selects_best_live_signal_without_fixed_categories():
     assert "not a generic printable planner" in differentiation.position
     assert any("low-energy" in item for item in differentiation.differentiators)
 
+    upgrade_path = build_listing_upgrade_path(brief, concept, differentiation)
+    assert len(upgrade_path.staged_upgrades) == 4
+    assert upgrade_path.staged_upgrades[1].stage == "first_data_pass"
+    assert any("Burnout recovery journal" in item for item in upgrade_path.next_product_expansions)
 
-def test_market_signals_file_drives_listing_metadata_and_mockup(tmp_path):
+
+def test_market_signals_file_drives_listing_metadata_and_listing_upgrade_path(tmp_path):
     signal_path = tmp_path / "signals.json"
     signal_path.write_text(
         json.dumps(
@@ -92,6 +98,9 @@ def test_market_signals_file_drives_listing_metadata_and_mockup(tmp_path):
     assert "product_concept" in manifest
     assert "differentiation_brief" in manifest
     assert "differentiation_brief" in metadata
+    assert "listing_upgrade_path" in manifest
+    assert "listing_upgrade_path" in metadata
+    assert len(manifest["listing_upgrade_path"]["staged_upgrades"]) == 4
     assert "work week" in metadata["description"].lower()
     assert manifest["market_brief"]["visual_keywords"][:3] == ["desk setup", "laptop", "coffee"]
     assert "budget_snapshot" in manifest["product_concept"]["selected_page_ids"]
@@ -156,6 +165,7 @@ def test_bundle_variation_builder_ranks_theme_and_niche_combinations():
     assert len(variations) == 2
     assert variations[0].score >= variations[1].score
     assert variations[0].differentiation.differentiators
+    assert variations[0].listing_upgrade_path.immediate_actions
     assert {variation.theme_id for variation in variations} <= {"soft_feminine", "muted_luxury"}
 
 
@@ -178,3 +188,4 @@ def test_build_variation_set_exports_ranked_variation_manifests(tmp_path):
     assert len(result.items) == 2
     assert result.items[0].result.manifest_path.exists()
     assert manifest["items"][0]["variation"]["differentiation"]["position"]
+    assert manifest["items"][0]["variation"]["listing_upgrade_path"]["primary_listing_goal"]

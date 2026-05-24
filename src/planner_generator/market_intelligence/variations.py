@@ -5,6 +5,7 @@ from typing import Iterable, List
 
 from planner_generator.market_intelligence.concepts import build_product_concept
 from planner_generator.market_intelligence.differentiation import build_differentiation_brief
+from planner_generator.market_intelligence.listing_upgrades import build_listing_upgrade_path
 from planner_generator.market_intelligence.models import BundleVariation, MarketSignal
 from planner_generator.market_intelligence.signals import build_market_brief
 from planner_generator.planner_specs.models import BundleSpec, PageSpec
@@ -39,6 +40,7 @@ def build_bundle_variations(
         niche = _theme_niche(niche, theme_id)
         concept = build_product_concept(niche, bundle, pages)
         differentiation = build_differentiation_brief(niche, concept)
+        upgrade_path = build_listing_upgrade_path(niche, concept, differentiation)
         variations.append(
             BundleVariation(
                 id=f"{index:02d}_{niche.slug}_{theme_id}",
@@ -48,6 +50,7 @@ def build_bundle_variations(
                 niche=niche,
                 product_concept=concept,
                 differentiation=differentiation,
+                listing_upgrade_path=upgrade_path,
             )
         )
     return sorted(variations, key=lambda variation: variation.score, reverse=True)

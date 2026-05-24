@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Dict, List
 
 from planner_generator.listing_assets.constraints import ETSY_DESCRIPTION_MAX_LENGTH, ETSY_TITLE_MAX_LENGTH, truncate_text
-from planner_generator.market_intelligence.models import DifferentiationBrief, NicheBrief, ProductConcept
+from planner_generator.market_intelligence.models import DifferentiationBrief, ListingUpgradePath, NicheBrief, ProductConcept
 from planner_generator.planner_specs.models import BundleSpec
 from planner_generator.seo.tags import generate_tags
 from planner_generator.theme_engine.models import Theme
@@ -15,6 +15,7 @@ def generate_listing_metadata(
     market_brief: NicheBrief | None = None,
     product_concept: ProductConcept | None = None,
     differentiation: DifferentiationBrief | None = None,
+    listing_upgrade_path: ListingUpgradePath | None = None,
 ) -> Dict[str, object]:
     tags = generate_tags(bundle, market_brief)
     title = _listing_title(bundle, market_brief, product_concept)
@@ -50,6 +51,8 @@ def generate_listing_metadata(
         metadata["product_name"] = product_concept.product_name
     if differentiation:
         metadata["differentiation_brief"] = differentiation.to_dict()
+    if listing_upgrade_path:
+        metadata["listing_upgrade_path"] = listing_upgrade_path.to_dict()
     return metadata
 
 

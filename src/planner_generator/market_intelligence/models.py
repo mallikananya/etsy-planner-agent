@@ -109,7 +109,7 @@ class DifferentiationBrief:
     differentiators: List[str]
     proof_points: List[str]
     seo_angle: str
-    mockup_direction: str
+    listing_visual_direction: str
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -119,7 +119,41 @@ class DifferentiationBrief:
             "differentiators": self.differentiators,
             "proof_points": self.proof_points,
             "seo_angle": self.seo_angle,
-            "mockup_direction": self.mockup_direction,
+            "listing_visual_direction": self.listing_visual_direction,
+        }
+
+
+@dataclass(frozen=True)
+class ListingUpgradeStep:
+    stage: str
+    goal: str
+    actions: List[str]
+    success_metric: str
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "stage": self.stage,
+            "goal": self.goal,
+            "actions": self.actions,
+            "success_metric": self.success_metric,
+        }
+
+
+@dataclass(frozen=True)
+class ListingUpgradePath:
+    primary_listing_goal: str
+    immediate_actions: List[str]
+    staged_upgrades: List[ListingUpgradeStep]
+    measurement_plan: List[str]
+    next_product_expansions: List[str]
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "primary_listing_goal": self.primary_listing_goal,
+            "immediate_actions": self.immediate_actions,
+            "staged_upgrades": [step.to_dict() for step in self.staged_upgrades],
+            "measurement_plan": self.measurement_plan,
+            "next_product_expansions": self.next_product_expansions,
         }
 
 
@@ -132,6 +166,7 @@ class BundleVariation:
     niche: NicheBrief
     product_concept: ProductConcept
     differentiation: DifferentiationBrief
+    listing_upgrade_path: ListingUpgradePath
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -142,6 +177,7 @@ class BundleVariation:
             "niche": self.niche.to_dict(),
             "product_concept": self.product_concept.to_dict(),
             "differentiation": self.differentiation.to_dict(),
+            "listing_upgrade_path": self.listing_upgrade_path.to_dict(),
         }
 
 

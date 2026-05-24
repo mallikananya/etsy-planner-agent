@@ -123,7 +123,7 @@ output/variations/variation_manifest.json
 
 ## Build From Imported Market Signals
 
-While the Etsy API key is pending, feed the generator a JSON file from current Etsy research, ads data, keyword tools, or manual trend notes. The code ranks those signals at build time and uses the selected niche brief for the listing title, description, tags, manifest, and preview mockup direction.
+While the Etsy API key is pending, feed the generator a JSON file from current Etsy research, ads data, keyword tools, or manual trend notes. The code ranks those signals at build time and uses the selected niche brief for the listing title, description, tags, manifest, listing visuals, and listing upgrade path.
 
 ```json
 {

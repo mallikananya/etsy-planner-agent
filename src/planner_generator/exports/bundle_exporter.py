@@ -10,7 +10,8 @@ from planner_generator.listing_assets.constraints import ETSY_DIGITAL_FILE_MAX_C
 from planner_generator.listing_assets.metadata import generate_listing_metadata
 from planner_generator.market_intelligence.concepts import build_product_concept
 from planner_generator.market_intelligence.differentiation import build_differentiation_brief
-from planner_generator.market_intelligence.models import DifferentiationBrief, MarketSignal, NicheBrief, ProductConcept
+from planner_generator.market_intelligence.listing_upgrades import build_listing_upgrade_path
+from planner_generator.market_intelligence.models import DifferentiationBrief, ListingUpgradePath, MarketSignal, NicheBrief, ProductConcept
 from planner_generator.market_intelligence.page_selection import product_concept_with_pages, repeat_pages_for_bundle, select_concept_pages
 from planner_generator.market_intelligence.signals import build_market_brief
 from planner_generator.packaging.zipper import create_customer_zip
@@ -50,6 +51,7 @@ def export_bundle(bundle_path: str | Path, theme: Theme, output_root: str | Path
     else:
         product_concept = product_concept_with_pages(product_concept, base_pages)
     differentiation = build_differentiation_brief(market_brief, product_concept)
+    listing_upgrade_path = build_listing_upgrade_path(market_brief, product_concept, differentiation)
     output_dir = Path(output_root) / bundle.id
     if output_dir.exists():
         shutil.rmtree(output_dir)
@@ -73,7 +75,7 @@ def export_bundle(bundle_path: str | Path, theme: Theme, output_root: str | Path
 
     listing_dir = output_dir / "listing"
     listing_dir.mkdir(parents=True, exist_ok=True)
-    listing_metadata = generate_listing_metadata(bundle, theme, market_brief, product_concept, differentiation)
+    listing_metadata = generate_listing_metadata(bundle, theme, market_brief, product_concept, differentiation, listing_upgrade_path)
     (listing_dir / "title.txt").write_text(listing_metadata["title"] + "\n", encoding="utf-8")
     (listing_dir / "description.txt").write_text(listing_metadata["description"] + "\n", encoding="utf-8")
     (listing_dir / "tags.json").write_text(json.dumps(listing_metadata["tags"], indent=2) + "\n", encoding="utf-8")
@@ -85,7 +87,7 @@ def export_bundle(bundle_path: str | Path, theme: Theme, output_root: str | Path
     zip_path = create_customer_zip(output_dir, primary_customer_files)
     generated_files.append(zip_path)
 
-    manifest = _build_manifest(bundle, theme, pages, generated_files, primary_customer_files, individual_page_files, preview_files, zip_path, output_dir, market_brief, product_concept, differentiation)
+    manifest = _build_manifest(bundle, theme, pages, generated_files, primary_customer_files, individual_page_files, preview_files, zip_path, output_dir, market_brief, product_concept, differentiation, listing_upgrade_path)
     manifest_path = output_dir / "manifest.json"
     manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
     generated_files.append(manifest_path)
@@ -129,6 +131,7 @@ def _build_manifest(
     market_brief: NicheBrief,
     product_concept: ProductConcept,
     differentiation: DifferentiationBrief,
+    listing_upgrade_path: ListingUpgradePath,
 ) -> Dict[str, object]:
     primary_customer_file_refs = [str(path.relative_to(output_dir)) for path in primary_customer_files]
     preview_file_refs = [str(path.relative_to(output_dir)) for path in preview_files]
@@ -142,6 +145,7 @@ def _build_manifest(
         "market_brief": market_brief.to_dict(),
         "product_concept": product_concept.to_dict(),
         "differentiation_brief": differentiation.to_dict(),
+        "listing_upgrade_path": listing_upgrade_path.to_dict(),
         "primary_customer_files": primary_customer_file_refs,
         "individual_page_files": [str(path.relative_to(output_dir)) for path in individual_page_files],
         "preview_files": preview_file_refs,
