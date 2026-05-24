@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import json
+import mimetypes
 import urllib.error
 import urllib.parse
 import urllib.request
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Dict, Protocol
 
 from planner_generator.etsy_integration.config import EtsyApiConfig
@@ -15,6 +17,9 @@ class EtsyTransport(Protocol):
         ...
 
     def post_form(self, url: str, headers: Dict[str, str], payload: Dict[str, str]) -> Dict[str, object]:
+        ...
+
+    def post_multipart(self, url: str, headers: Dict[str, str], fields: Dict[str, str], files: Dict[str, Path]) -> Dict[str, object]:
         ...
 
 
@@ -41,6 +46,20 @@ class UrllibEtsyTransport:
             body = error.read().decode("utf-8", errors="replace")
             raise RuntimeError(f"Etsy OAuth request failed with status {error.code}: {body}") from error
 
+    def post_multipart(self, url: str, headers: Dict[str, str], fields: Dict[str, str], files: Dict[str, Path]) -> Dict[str, object]:
+        boundary = "----etsy-planner-agent-boundary"
+        body = _multipart_body(boundary, fields, files)
+        request_headers = dict(headers)
+        request_headers["Content-Type"] = f"multipart/form-data; boundary={boundary}"
+        request = urllib.request.Request(url=url, data=body, headers=request_headers, method="POST")
+        try:
+            with urllib.request.urlopen(request, timeout=60) as response:
+                response_body = response.read().decode("utf-8")
+                return json.loads(response_body) if response_body else {}
+        except urllib.error.HTTPError as error:
+            response_body = error.read().decode("utf-8", errors="replace")
+            raise RuntimeError(f"Etsy multipart request failed with status {error.code}: {response_body}") from error
+
 
 @dataclass(frozen=True)
 class EtsyDraftApiClient:
@@ -51,6 +70,27 @@ class EtsyDraftApiClient:
         self.config.validate_for_live_submission()
         url = f"{self.config.api_base_url}/shops/{self.config.shop_id}/listings"
         return self.transport.post_json(url, self.config.headers(), _create_listing_request(draft_payload, self.config))
+
+    def upload_listing_image(self, listing_id: int | str, image_path: str | Path, rank: int = 1) -> Dict[str, object]:
+        self.config.validate_for_live_submission()
+        url = f"{self.config.api_base_url}/shops/{self.config.shop_id}/listings/{listing_id}/images"
+        return self.transport.post_multipart(
+            url,
+            self.config.headers(content_type=None),
+            {"rank": str(rank)},
+            {"image": Path(image_path)},
+        )
+
+    def upload_listing_file(self, listing_id: int | str, file_path: str | Path, name: str | None = None) -> Dict[str, object]:
+        self.config.validate_for_live_submission()
+        path = Path(file_path)
+        url = f"{self.config.api_base_url}/shops/{self.config.shop_id}/listings/{listing_id}/files"
+        return self.transport.post_multipart(
+            url,
+            self.config.headers(content_type=None),
+            {"name": name or path.name},
+            {"file": path},
+        )
 
 
 def _create_listing_request(draft_payload: Dict[str, object], config: EtsyApiConfig) -> Dict[str, object]:
@@ -66,3 +106,30 @@ def _create_listing_request(draft_payload: Dict[str, object], config: EtsyApiCon
         "quantity": config.quantity,
         "type": "download",
     }
+
+
+def _multipart_body(boundary: str, fields: Dict[str, str], files: Dict[str, Path]) -> bytes:
+    chunks: list[bytes] = []
+    for name, value in fields.items():
+        chunks.extend(
+            [
+                f"--{boundary}\r\n".encode("utf-8"),
+                f'Content-Disposition: form-data; name="{name}"\r\n\r\n'.encode("utf-8"),
+                str(value).encode("utf-8"),
+                b"\r\n",
+            ]
+        )
+    for field_name, path in files.items():
+        path = Path(path)
+        content_type = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
+        chunks.extend(
+            [
+                f"--{boundary}\r\n".encode("utf-8"),
+                f'Content-Disposition: form-data; name="{field_name}"; filename="{path.name}"\r\n'.encode("utf-8"),
+                f"Content-Type: {content_type}\r\n\r\n".encode("utf-8"),
+                path.read_bytes(),
+                b"\r\n",
+            ]
+        )
+    chunks.append(f"--{boundary}--\r\n".encode("utf-8"))
+    return b"".join(chunks)

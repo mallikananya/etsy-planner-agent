@@ -17,10 +17,20 @@ ROOT = Path(__file__).resolve().parents[1]
 class FakeTransport:
     def __init__(self):
         self.calls = []
+        self.multipart_calls = []
 
     def post_json(self, url, headers, payload):
         self.calls.append({"url": url, "headers": headers, "payload": payload})
         return {"listing_id": 123456789, "state": "draft"}
+
+    def post_form(self, url, headers, payload):
+        raise AssertionError("Submission should not use OAuth form posts.")
+
+    def post_multipart(self, url, headers, fields, files):
+        self.multipart_calls.append({"url": url, "headers": headers, "fields": fields, "files": files})
+        if url.endswith("/images"):
+            return {"listing_image_id": len(self.multipart_calls)}
+        return {"listing_file_id": len(self.multipart_calls)}
 
 
 def test_etsy_config_validates_missing_live_fields():
@@ -54,6 +64,11 @@ def test_live_submission_uses_mocked_etsy_transport(tmp_path):
     assert transport.calls[0]["url"].endswith("/shops/42/listings")
     assert transport.calls[0]["payload"]["type"] == "download"
     assert transport.calls[0]["payload"]["taxonomy_id"] == 1234
+    assert len(transport.multipart_calls) == 12
+    assert "/images" in transport.multipart_calls[0]["url"]
+    assert "/files" in transport.multipart_calls[-1]["url"]
+    assert result.report["uploads"]["listing_images"]
+    assert result.report["uploads"]["digital_files"]
 
 
 def _draft_payload_path(tmp_path: Path) -> Path:

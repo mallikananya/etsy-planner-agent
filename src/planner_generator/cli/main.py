@@ -9,6 +9,7 @@ from planner_generator.exports.bundle_exporter import export_bundle
 from planner_generator.etsy_integration.client import EtsyDraftClient
 from planner_generator.etsy_integration.oauth import env_lines_for_tokens, finish_oauth_flow, refresh_oauth_token, start_oauth_flow
 from planner_generator.etsy_integration.submission import submit_etsy_draft
+from planner_generator.etsy_integration.taxonomy import env_line_for_taxonomy, search_taxonomy_candidates, select_taxonomy
 from planner_generator.rendering.page_renderer import render_page_to_pdf
 from planner_generator.planner_specs.loader import load_page_spec
 from planner_generator.theme_engine.loader import load_theme
@@ -65,6 +66,18 @@ def main() -> None:
     auth_refresh_parser.add_argument("--refresh-token", default=None, help="Refresh token. Defaults to ETSY_REFRESH_TOKEN.")
     auth_refresh_parser.add_argument("--output", default=".etsy/oauth_tokens.json")
 
+    refresh_token_parser = subparsers.add_parser("refresh-etsy-token", help="Alias for refreshing Etsy OAuth access token.")
+    refresh_token_parser.add_argument("--api-key", default=None, help="Etsy API key. Defaults to ETSY_API_KEY.")
+    refresh_token_parser.add_argument("--refresh-token", default=None, help="Refresh token. Defaults to ETSY_REFRESH_TOKEN.")
+    refresh_token_parser.add_argument("--output", default=".etsy/oauth_tokens.json")
+
+    taxonomy_parser = subparsers.add_parser("etsy-taxonomy-search", help="Search local Etsy taxonomy candidates.")
+    taxonomy_parser.add_argument("--query", default="planner")
+
+    taxonomy_select_parser = subparsers.add_parser("etsy-taxonomy-select", help="Store a selected Etsy taxonomy candidate locally.")
+    taxonomy_select_parser.add_argument("--taxonomy-id", required=True)
+    taxonomy_select_parser.add_argument("--output", default=".etsy/taxonomy_selection.json")
+
     args = parser.parse_args()
 
     if args.command == "build-page":
@@ -107,7 +120,7 @@ def main() -> None:
         print("Add or update these lines in your local .env:")
         for line in env_lines_for_tokens(result.tokens):
             print(line)
-    elif args.command == "etsy-auth-refresh":
+    elif args.command in {"etsy-auth-refresh", "refresh-etsy-token"}:
         api_key = args.api_key or os.environ.get("ETSY_API_KEY", "")
         refresh_token = args.refresh_token or os.environ.get("ETSY_REFRESH_TOKEN", "")
         result = refresh_oauth_token(api_key=api_key, refresh_token=refresh_token, output_path=args.output)
@@ -115,6 +128,16 @@ def main() -> None:
         print("Add or update these lines in your local .env:")
         for line in env_lines_for_tokens(result.tokens):
             print(line)
+    elif args.command == "etsy-taxonomy-search":
+        matches = search_taxonomy_candidates(args.query)
+        for item in matches:
+            print(f"{item['id']}: {item['name']} - {' > '.join(item['path'])}")
+            print(f"  {item['notes']}")
+    elif args.command == "etsy-taxonomy-select":
+        result = select_taxonomy(args.taxonomy_id, args.output)
+        print(f"Wrote taxonomy selection to {result.output_path}")
+        print("Add or update this line in your local .env:")
+        print(env_line_for_taxonomy(result.selection))
 
 
 if __name__ == "__main__":

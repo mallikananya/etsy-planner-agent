@@ -31,12 +31,14 @@ class EtsyApiConfig:
             api_base_url=os.environ.get("ETSY_API_BASE_URL", DEFAULT_API_BASE_URL),
         )
 
-    def headers(self) -> Dict[str, str]:
-        return {
+    def headers(self, content_type: str | None = "application/json") -> Dict[str, str]:
+        headers = {
             "Authorization": f"Bearer {self.access_token}",
             "x-api-key": self.api_key,
-            "Content-Type": "application/json",
         }
+        if content_type:
+            headers["Content-Type"] = content_type
+        return headers
 
     def missing_fields(self) -> List[str]:
         missing: List[str] = []

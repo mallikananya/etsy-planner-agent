@@ -130,8 +130,17 @@ The command writes tokens under `.etsy/` and prints `.env` lines to add locally.
 Refresh an access token:
 
 ```bash
-python -m planner_generator.cli.main etsy-auth-refresh
+python -m planner_generator.cli.main refresh-etsy-token
 ```
+
+Choose a local taxonomy candidate:
+
+```bash
+python -m planner_generator.cli.main etsy-taxonomy-search --query planner
+python -m planner_generator.cli.main etsy-taxonomy-select --taxonomy-id 2078
+```
+
+Always confirm the taxonomy in Etsy before live listing creation.
 
 ## Architecture
 
