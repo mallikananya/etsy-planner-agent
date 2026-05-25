@@ -65,6 +65,7 @@ def test_live_submission_uses_mocked_etsy_transport(tmp_path):
     assert result.report["listing_id"] == 123456789
     assert result.report["auto_publish"] is False
     assert transport.calls[0]["url"].endswith("/shops/42/listings")
+    assert transport.calls[0]["headers"]["x-api-key"] == "api-key:api-secret"
     assert transport.calls[0]["payload"]["type"] == "download"
     assert transport.calls[0]["payload"]["taxonomy_id"] == 1234
     assert len(transport.multipart_calls) == 12
@@ -95,6 +96,7 @@ def test_live_submission_autofills_generated_price_when_env_price_is_blank(tmp_p
         taxonomy_id="1234",
         price="",
         quantity=999,
+        api_secret="api-secret",
     )
     client = EtsyDraftApiClient(config=config, transport=transport)
 
@@ -120,4 +122,5 @@ def _valid_config() -> EtsyApiConfig:
         taxonomy_id="1234",
         price="9.99",
         quantity=999,
+        api_secret="api-secret",
     )

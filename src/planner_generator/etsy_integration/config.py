@@ -17,12 +17,14 @@ class EtsyApiConfig:
     price: str
     quantity: int
     api_base_url: str = DEFAULT_API_BASE_URL
+    api_secret: str = ""
 
     @classmethod
     def from_env(cls) -> "EtsyApiConfig":
         quantity = os.environ.get("ETSY_QUANTITY", "999")
         return cls(
             api_key=os.environ.get("ETSY_API_KEY", ""),
+            api_secret=os.environ.get("ETSY_API_SECRET", ""),
             access_token=os.environ.get("ETSY_ACCESS_TOKEN", ""),
             shop_id=os.environ.get("ETSY_SHOP_ID", ""),
             taxonomy_id=os.environ.get("ETSY_TAXONOMY_ID", ""),
@@ -34,15 +36,21 @@ class EtsyApiConfig:
     def headers(self, content_type: str | None = "application/json") -> Dict[str, str]:
         headers = {
             "Authorization": f"Bearer {self.access_token}",
-            "x-api-key": self.api_key,
+            "x-api-key": self.combined_api_key,
         }
         if content_type:
             headers["Content-Type"] = content_type
         return headers
 
+    @property
+    def combined_api_key(self) -> str:
+        if self.api_key and self.api_secret:
+            return f"{self.api_key}:{self.api_secret}"
+        return self.api_key
+
     def missing_fields(self, require_price: bool = True) -> List[str]:
         missing: List[str] = []
-        for field_name in ["api_key", "access_token", "shop_id", "taxonomy_id"]:
+        for field_name in ["api_key", "api_secret", "access_token", "shop_id", "taxonomy_id"]:
             if not getattr(self, field_name):
                 missing.append(field_name)
         if require_price and not self.price:

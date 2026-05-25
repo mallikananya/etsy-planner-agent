@@ -34,6 +34,7 @@ def test_lookup_shop_selects_first_shop_and_writes_env_line(tmp_path):
     assert saved["shop_id"] == 111
     assert env_line_for_shop(result.shop) == "ETSY_SHOP_ID=111"
     assert transport.calls[0]["url"].endswith("/users/me/shops")
+    assert transport.calls[0]["headers"]["x-api-key"] == "api-key:api-secret"
 
 
 def test_lookup_shop_can_select_by_name(tmp_path):
@@ -60,4 +61,5 @@ def _config() -> EtsyApiConfig:
         taxonomy_id="",
         price="",
         quantity=999,
+        api_secret="api-secret",
     )

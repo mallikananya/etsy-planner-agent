@@ -25,7 +25,7 @@ def test_etsy_preflight_passes_for_complete_payload(tmp_path):
 
 def test_etsy_preflight_accepts_generated_payload_price_without_config_price(tmp_path):
     payload_path = _draft_payload_path(tmp_path)
-    config = EtsyApiConfig("api-key", "access-token", "42", "1234", "", 999)
+    config = EtsyApiConfig("api-key", "access-token", "42", "1234", "", 999, api_secret="api-secret")
 
     result = run_etsy_preflight(payload_path, tmp_path / "preflight", config=config)
 
@@ -54,4 +54,4 @@ def _draft_payload_path(tmp_path: Path) -> Path:
 
 
 def _valid_config() -> EtsyApiConfig:
-    return EtsyApiConfig("api-key", "access-token", "42", "1234", "9.99", 999)
+    return EtsyApiConfig("api-key", "access-token", "42", "1234", "9.99", 999, api_secret="api-secret")
