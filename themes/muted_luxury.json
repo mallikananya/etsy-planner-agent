@@ -1,40 +1,46 @@
 {
   "id": "muted_luxury",
-  "name": "Muted Luxury",
+  "name": "Soft Editorial Neutral",
   "colors": {
-    "background": "#FBF8F1",
-    "heading": "#27231F",
-    "body": "#3D3932",
-    "muted": "#696056",
-    "accent": "#8D7A61",
-    "divider": "#BFB5A7",
-    "line": "#AFA596",
-    "top_band": "#E9E1D2",
-    "side_band": "#DDE6DC",
-    "corner_block": "#CDB77E",
-    "ornament": "#75652F",
-    "page_rule": "#C9BDAE",
-    "section_fill": "#FFFDF8",
-    "section_band": "#E9E1D2",
-    "row_fill": "#F6F1E7",
-    "checkbox_fill": "#FFFDF8",
+    "background": "#FFFEFA",
+    "listing_background": "#EFE7DA",
+    "listing_panel": "#F9F4EC",
+    "paper_shadow": "#C8BBAA",
+    "heading": "#2D2925",
+    "body": "#4A443D",
+    "muted": "#766D62",
+    "accent": "#9A846D",
+    "sage": "#D8E0D1",
+    "sage_deep": "#A7B39E",
+    "taupe": "#CDBEAC",
+    "divider": "#CEC2B4",
+    "line": "#B5AA9C",
+    "top_band": "#FFFFFF",
+    "side_band": "#FFFFFF",
+    "corner_block": "#D8E0D1",
+    "ornament": "#9A846D",
+    "page_rule": "#D8CFC2",
+    "section_fill": "#FFFFFF",
+    "section_band": "#F2ECE3",
+    "row_fill": "#FBF8F2",
+    "checkbox_fill": "#FFFFFF",
     "paper_fill": "#FFFFFF",
-    "label_fill": "#E5DBC9",
-    "prompt_fill": "#EFE6D7"
+    "label_fill": "#F2ECE3",
+    "prompt_fill": "#F7F1E9"
   },
   "typography": {
-    "title_size": "31",
-    "subtitle_size": "10.5",
-    "section_title_size": "9.5",
+    "title_size": "34",
+    "subtitle_size": "11",
+    "section_title_size": "9",
     "body_size": "9.5"
   },
   "spacing": {
-    "page_margin": 50,
-    "header_height": 92,
-    "section_gap": 16
+    "page_margin": 58,
+    "header_height": 104,
+    "section_gap": 22
   },
   "strokes": {
-    "divider": 0.7,
-    "line": 0.45
+    "divider": 0.42,
+    "line": 0.38
   }
 }

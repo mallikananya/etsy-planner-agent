@@ -8,6 +8,7 @@ from typing import Dict, List
 
 from planner_generator.listing_assets.constraints import ETSY_DIGITAL_FILE_MAX_COUNT, ETSY_LISTING_IMAGE_MAX_COUNT
 from planner_generator.listing_assets.metadata import generate_listing_metadata
+from planner_generator.bundle_builder.lifestyle_pages import build_lifestyle_pages
 from planner_generator.market_intelligence.concepts import build_product_concept
 from planner_generator.market_intelligence.differentiation import build_differentiation_brief
 from planner_generator.market_intelligence.listing_upgrades import build_listing_upgrade_path
@@ -37,6 +38,7 @@ def export_bundle(bundle_path: str | Path, theme: Theme, output_root: str | Path
     bundle = load_bundle_spec(bundle_path)
     base_pages = _load_bundle_base_pages(bundle, bundle_path.parent)
     pages = repeat_pages_for_bundle(base_pages, bundle.sequence_repeat)
+    pages = build_lifestyle_pages(bundle, pages)
     validate_page_count(bundle, pages)
     market_brief = build_market_brief(bundle, pages, market_signals)
     product_concept = build_product_concept(market_brief, bundle, pages)
@@ -46,11 +48,12 @@ def export_bundle(bundle_path: str | Path, theme: Theme, output_root: str | Path
             base_pages = select_concept_pages(candidate_pages, product_concept, market_brief, bundle, target_count=len(bundle.pages))
         product_concept = product_concept_with_pages(product_concept, base_pages)
         pages = repeat_pages_for_bundle(base_pages, bundle.sequence_repeat)
+        pages = build_lifestyle_pages(bundle, pages)
         validate_page_count(bundle, pages)
         market_brief = build_market_brief(bundle, pages, market_signals)
         product_concept = product_concept_with_pages(build_product_concept(market_brief, bundle, pages), base_pages)
     else:
-        product_concept = product_concept_with_pages(product_concept, base_pages)
+        product_concept = product_concept_with_pages(product_concept, pages)
     differentiation = build_differentiation_brief(market_brief, product_concept)
     listing_upgrade_path = build_listing_upgrade_path(market_brief, product_concept, differentiation)
     pricing_strategy = build_pricing_strategy(market_brief, product_concept, differentiation, page_count=len(pages))

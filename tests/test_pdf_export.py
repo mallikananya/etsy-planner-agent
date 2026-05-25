@@ -22,7 +22,8 @@ def test_export_bundle_writes_manifest_and_pdfs(tmp_path):
     assert (result.output_dir / "listing/title.txt").exists()
     assert (result.output_dir / "exports/png/listing-images/01_hero.png").exists()
     assert (result.output_dir / "exports/png/page-previews/01_wellness_weekly.png").exists()
-    assert (result.output_dir / "exports/png/listing-images/03_page_collage.png").exists()
+    assert (result.output_dir / "exports/png/listing-images/03_bundle_overview.png").exists()
+    assert (result.output_dir / "exports/png/listing-images/08_mobile_thumbnail.png").exists()
 
     combined_pdf = (result.output_dir / "exports/pdf/us-letter/wellness_starter_us-letter_complete.pdf").read_bytes()
     assert b"/Count 48" in combined_pdf
@@ -37,7 +38,12 @@ def test_export_bundle_writes_manifest_and_pdfs(tmp_path):
     assert manifest["preview_files"] == [
         "exports/png/listing-images/01_hero.png",
         "exports/png/listing-images/02_included_pages.png",
-        "exports/png/listing-images/03_page_collage.png",
+        "exports/png/listing-images/03_bundle_overview.png",
+        "exports/png/listing-images/04_lifestyle_mockup.png",
+        "exports/png/listing-images/05_feature_highlights.png",
+        "exports/png/listing-images/06_size_specifications.png",
+        "exports/png/listing-images/07_zoomed_detail.png",
+        "exports/png/listing-images/08_mobile_thumbnail.png",
         "exports/png/page-previews/01_wellness_weekly.png",
         "exports/png/page-previews/02_daily_reset.png",
         "exports/png/page-previews/03_morning_ritual.png",

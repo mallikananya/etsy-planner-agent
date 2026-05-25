@@ -1,16 +1,19 @@
 {
   "id": "component_showcase",
-  "name": "Atelier Aurelia Minimalist Printable Planner Bundle",
-  "description": "A polished 10-page printable planner bundle with elegant neutral layouts for monthly, weekly, daily, goal, habit, budget, brain dump, gratitude, meal planning, and notes pages.",
+  "name": "Sunday Reset Planner Printable Bundle",
+  "description": "A soft, lifestyle-led printable planner bundle for calm routines, gentle priorities, self-care resets, slow living notes, weekly planning, and everyday life admin.",
   "paper_sizes": ["letter", "a4"],
   "sequence_repeat": 1,
   "metadata": {
     "brand_name": "Atelier Aurelia",
-    "product_title": "Minimalist Printable Planner Bundle",
-    "seo_title": "Minimalist Printable Planner Bundle, Elegant Planner Pages, Atelier Aurelia PDF",
-    "included_pages": ["Monthly Overview", "Weekly Reset", "Daily Planner", "Goal Planner", "Habit Tracker", "Budget Snapshot", "Brain Dump", "Gratitude Journal", "Meal Planner", "Notes Page"],
-    "page_count": 10,
-    "tags": ["printable planner", "planner bundle", "minimalist planner", "daily planner", "weekly planner", "goal planner", "habit tracker", "budget planner", "gratitude journal", "meal planner"]
+    "product_title": "Sunday Reset Planner Printable Bundle",
+    "seo_title": "Sunday Reset Planner Printable Bundle",
+    "bundle_strategy": "soft_life_reset",
+    "generated_page_count": 50,
+    "collection": "sunday_reset_planner",
+    "included_pages": ["Sunday Reset", "Soft Weekly Planner", "Daily Reset", "Monthly Reset", "Gentle Priorities", "Things On My Mind", "Tiny Wins", "Self-Care Menu", "Monthly Habit Tracker", "Soft Meal Plan", "Money Notes", "Notes To Self"],
+    "page_count": 50,
+    "tags": ["sunday reset", "soft life planner", "printable planner", "weekly reset", "daily planner", "self care planner", "routine planner", "neutral planner", "planner printable", "digital download", "life admin", "wellness planner", "habit tracker"]
   },
   "pages": [
     {

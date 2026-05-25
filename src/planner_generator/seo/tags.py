@@ -15,13 +15,19 @@ def generate_tags(bundle: BundleSpec, market_brief: NicheBrief | None = None) ->
     trend_tags = market_brief.seo_tags if market_brief else []
     configured = [str(tag) for tag in bundle.metadata.get("tags", [])]
     defaults = [
+        "sunday reset",
+        "soft life planner",
         "printable planner",
-        "weekly planner",
-        "digital planner",
+        "weekly reset",
+        "self care planner",
+        "routine planner",
+        "neutral planner",
         "planner printable",
-        "productivity",
+        "digital download",
+        "life admin",
         "wellness planner",
-        "instant download",
+        "habit tracker",
+        "daily planner",
     ]
     tags: List[str] = []
     for tag in trend_tags + configured + defaults:

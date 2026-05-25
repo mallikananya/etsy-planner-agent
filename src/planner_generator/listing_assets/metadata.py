@@ -65,13 +65,21 @@ def generate_listing_metadata(
 
 
 def _listing_title(bundle: BundleSpec, market_brief: NicheBrief | None, product_concept: ProductConcept | None) -> str:
-    if market_brief:
-        keywords = ", ".join(market_brief.title_keywords[:3])
-        product_name = product_concept.product_name if product_concept else market_brief.name
-        base = f"{product_name} Printable, {keywords}, Instant Download PDF"
+    has_external_market_signal = bool(market_brief and market_brief.source_signals and market_brief.source_signals[0].get("source") != "bundle_metadata")
+    if has_external_market_signal and product_concept:
+        base = product_concept.product_name
+        supporting = ["Printable Reset Planner", "Neutral PDF Pages", "Instant Download"]
     else:
-        base = bundle.metadata.get("seo_title") or bundle.name
-    return truncate_text(str(base), ETSY_TITLE_MAX_LENGTH)
+        base = str(bundle.metadata.get("seo_title") or bundle.metadata.get("product_title") or bundle.name)
+        supporting = ["Soft Life Planner", "Neutral Printable PDF", "Self Care Reset Pages"]
+    title_parts: List[str] = []
+    seen = set()
+    for part in [base] + supporting:
+        key = part.lower().replace(" printable", "").replace(" planner", "").strip()
+        if key and key not in seen:
+            title_parts.append(part)
+            seen.add(key)
+    return truncate_text(" | ".join(title_parts), ETSY_TITLE_MAX_LENGTH)
 
 
 def _listing_description(
@@ -82,35 +90,56 @@ def _listing_description(
     differentiation: DifferentiationBrief | None,
     objection_coverage: Dict[str, object],
 ) -> str:
-    included = ", ".join(bundle.metadata.get("included_pages", []))
-    if product_concept:
-        included = ", ".join(product_concept.included_page_titles)
+    included_pages = [str(page) for page in bundle.metadata.get("included_pages", [])]
+    if product_concept and product_concept.included_page_titles:
+        included_pages = product_concept.included_page_titles[:18]
+    page_count = int(bundle.metadata.get("page_count") or len(included_pages) or 0)
+    opening = "A soft printable planner bundle for Sunday resets, gentle routines, life admin, self-care check-ins, and quiet weekly planning."
+    if market_brief and market_brief.source_signals and market_brief.source_signals[0].get("source") != "bundle_metadata":
+        opening = f"A soft printable reset planner for {market_brief.name.lower()} routines, work week planning, gentle priorities, and calm life admin."
     details: List[str] = [
-        _market_positioning(bundle, market_brief, product_concept),
+        opening,
         "",
-        "Printable digital planner bundle.",
-        f"Theme: {theme.name}.",
+        "This set is designed to feel calm on your desk and easy to actually use: airy layouts, warm neutral styling, elegant headings, simple writing space, and prompts that feel human instead of corporate.",
+        "",
+        "What is included",
+        f"- {page_count} printable planner pages" if page_count else "- Printable planner pages",
+        "- Complete US Letter PDF",
+        "- Complete A4 PDF",
+        "- Individual page PDFs for flexible printing",
+        "- Instant digital download",
+        "",
+        "Page themes include",
     ]
-    if product_concept:
-        details.append(product_concept.promise)
-        details.append(f"Designed for: {product_concept.buyer_persona}.")
-        details.append(f"Product angle: {product_concept.listing_angle}.")
-    if differentiation:
-        details.append(f"Why this planner is different: {differentiation.differentiators[0]}")
-    if market_brief:
-        details.extend(market_brief.description_hooks)
-        details.append(f"Niche focus: {market_brief.angle}.")
-        if market_brief.long_tail_keywords:
-            details.append(f"Search-friendly phrases: {', '.join(market_brief.long_tail_keywords[:6])}.")
-    if included:
-        details.append(f"Included pages: {included}.")
-    details.extend([""] + objection_description_lines(objection_coverage))
+    for page_name in included_pages[:14]:
+        details.append(f"- {page_name}")
     details.extend(
         [
-            "Includes complete joined planner PDFs plus individual page PDFs for flexible printing.",
-            "Includes US Letter and A4 PDF files when enabled in the bundle spec.",
-            "Customer ZIP is included as a convenient Etsy upload and download package.",
-            "No physical item will be shipped.",
+            "",
+            "Perfect for",
+            "- Sunday reset routines",
+            "- Soft productivity and slow living",
+            "- Weekly planning without overwhelm",
+            "- Self-care check-ins and tiny habits",
+            "- Pretty, neutral printable desk stationery",
+            "",
+            "Printing details",
+            "- Digital PDF files only; no physical item will be shipped",
+            "- Print at home or with a local print shop",
+            "- Use actual size / 100% scale for best results",
+            "- Reprint your favorite pages whenever you need a fresh start",
+            "",
+            "Quick answers before you buy",
+            "- This is a printable digital product, not a physical planner",
+            "- This is not an editable Canva template",
+            "- The files are ready to print in US Letter and A4 sizes",
+            "- You can use the pages in a note-taking app if you prefer digital handwriting",
+            "",
+            "Aesthetic",
+            "Warm ivory, soft beige, muted sage, taupe accents, charcoal text, editorial serif headings, and clean sans-serif body text.",
+            "",
+            "Please note",
+            "Colors can vary slightly by monitor and printer. This is a digital download, so you will receive files through Etsy after purchase.",
         ]
     )
     return truncate_text("\n".join(details).strip(), ETSY_DESCRIPTION_MAX_LENGTH)

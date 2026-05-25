@@ -7,7 +7,7 @@ from planner_generator.layout_engine.page_sizes import get_page_size
 from planner_generator.planner_specs.models import BundleSpec, PageSpec, SectionSpec
 
 
-MAX_BUNDLE_PAGES = 48
+MAX_BUNDLE_PAGES = 60
 
 
 def validate_page_spec(page: PageSpec) -> None:
