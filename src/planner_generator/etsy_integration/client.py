@@ -78,7 +78,7 @@ def _preview_assets(manifest: Dict[str, object], bundle_dir: Path) -> List[str]:
     manifest_previews = [str(path) for path in manifest.get("preview_files", [])]
     if manifest_previews:
         return manifest_previews
-    return [str(path.relative_to(bundle_dir)) for path in sorted((bundle_dir / "previews").rglob("*.png"))]
+    return [str(path.relative_to(bundle_dir)) for path in sorted((bundle_dir / "exports" / "png").rglob("*.png"))]
 
 
 def _upload_plan(manifest: Dict[str, object]) -> Dict[str, object]:

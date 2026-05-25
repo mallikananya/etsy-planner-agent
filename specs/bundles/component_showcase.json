@@ -1,14 +1,16 @@
 {
   "id": "component_showcase",
-  "name": "Planner Component Showcase",
-  "description": "A compact printable planner bundle exercising reusable monthly, budget, gratitude, brain dump, and goal planning components.",
+  "name": "Atelier Aurelia Minimalist Printable Planner Bundle",
+  "description": "A polished 10-page printable planner bundle with elegant neutral layouts for monthly, weekly, daily, goal, habit, budget, brain dump, gratitude, meal planning, and notes pages.",
   "paper_sizes": ["letter", "a4"],
-  "sequence_repeat": 2,
+  "sequence_repeat": 1,
   "metadata": {
-    "seo_title": "Printable Planner Component Bundle, Monthly Budget Goals Gratitude Brain Dump PDF",
-    "included_pages": ["Monthly overview", "Budget snapshot", "Gratitude journal", "Brain dump", "Goal planner"],
+    "brand_name": "Atelier Aurelia",
+    "product_title": "Minimalist Printable Planner Bundle",
+    "seo_title": "Minimalist Printable Planner Bundle, Elegant Planner Pages, Atelier Aurelia PDF",
+    "included_pages": ["Monthly Overview", "Weekly Reset", "Daily Planner", "Goal Planner", "Habit Tracker", "Budget Snapshot", "Brain Dump", "Gratitude Journal", "Meal Planner", "Notes Page"],
     "page_count": 10,
-    "tags": ["printable planner", "goal planner", "budget planner", "gratitude journal", "brain dump", "monthly planner"]
+    "tags": ["printable planner", "planner bundle", "minimalist planner", "daily planner", "weekly planner", "goal planner", "habit tracker", "budget planner", "gratitude journal", "meal planner"]
   },
   "pages": [
     {
@@ -16,11 +18,23 @@
       "repeat": 1
     },
     {
-      "page": "../pages/budget_snapshot.json",
+      "page": "../pages/weekly_reset.json",
       "repeat": 1
     },
     {
-      "page": "../pages/gratitude_journal.json",
+      "page": "../pages/daily_planner.json",
+      "repeat": 1
+    },
+    {
+      "page": "../pages/goal_planner.json",
+      "repeat": 1
+    },
+    {
+      "page": "../pages/habit_tracker.json",
+      "repeat": 1
+    },
+    {
+      "page": "../pages/budget_snapshot.json",
       "repeat": 1
     },
     {
@@ -28,7 +42,15 @@
       "repeat": 1
     },
     {
-      "page": "../pages/goal_planner.json",
+      "page": "../pages/gratitude_journal.json",
+      "repeat": 1
+    },
+    {
+      "page": "../pages/meal_planner.json",
+      "repeat": 1
+    },
+    {
+      "page": "../pages/notes_page.json",
       "repeat": 1
     }
   ]

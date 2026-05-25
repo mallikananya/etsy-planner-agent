@@ -110,8 +110,8 @@ def test_market_signals_file_drives_listing_metadata_and_listing_upgrade_path(tm
     assert "not an editable Canva" in metadata["description"]
     assert "work week" in metadata["description"].lower()
     assert manifest["market_brief"]["visual_keywords"][:3] == ["desk setup", "laptop", "coffee"]
-    assert "budget_snapshot" in manifest["product_concept"]["selected_page_ids"]
-    assert (result.output_dir / "previews/pngs/00_cover.png").read_bytes().startswith(b"\x89PNG\r\n\x1a\n")
+    assert "weekly_reset" in manifest["product_concept"]["selected_page_ids"]
+    assert (result.output_dir / "exports/png/listing-images/01_hero.png").read_bytes().startswith(b"\x89PNG\r\n\x1a\n")
 
 
 def test_dynamic_page_selection_adapts_pages_to_market_concept():

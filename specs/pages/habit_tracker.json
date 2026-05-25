@@ -1,0 +1,33 @@
+{
+  "id": "habit_tracker",
+  "page_type": "habit_tracker",
+  "title": "Habit Tracker",
+  "subtitle": "Track simple routines across the month with space for notes and momentum cues.",
+  "metadata": {
+    "collection": "atelier_aurelia",
+    "collection_label": "Atelier Aurelia"
+  },
+  "sections": [
+    {
+      "id": "monthly_habits",
+      "type": "tracker_grid",
+      "title": "Monthly Habit Grid",
+      "weight": 1.8,
+      "fields": {
+        "rows": 8,
+        "columns": 31
+      }
+    },
+    {
+      "id": "habit_notes",
+      "type": "two_column",
+      "title": "Notes + Adjustments",
+      "weight": 0.85,
+      "fields": {
+        "left_title": "Working",
+        "right_title": "Adjust",
+        "line_count": 5
+      }
+    }
+  ]
+}

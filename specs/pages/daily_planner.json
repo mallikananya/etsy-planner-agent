@@ -1,0 +1,42 @@
+{
+  "id": "daily_planner",
+  "page_type": "daily_planner",
+  "title": "Daily Planner",
+  "subtitle": "A clean daily layout for schedule notes, priorities, tasks, and evening reflection.",
+  "metadata": {
+    "collection": "atelier_aurelia",
+    "collection_label": "Atelier Aurelia"
+  },
+  "sections": [
+    {
+      "id": "today_focus",
+      "type": "prompt_box",
+      "title": "Today",
+      "weight": 0.75,
+      "fields": {
+        "prompt": "Date, focus, and one thing that would make today feel complete:",
+        "line_count": 3
+      }
+    },
+    {
+      "id": "daily_schedule",
+      "type": "two_column",
+      "title": "Schedule + Tasks",
+      "weight": 1.5,
+      "fields": {
+        "left_title": "Schedule",
+        "right_title": "To Do",
+        "line_count": 9
+      }
+    },
+    {
+      "id": "daily_reflection",
+      "type": "writing_lines",
+      "title": "Evening Notes",
+      "weight": 0.8,
+      "fields": {
+        "count": 6
+      }
+    }
+  ]
+}

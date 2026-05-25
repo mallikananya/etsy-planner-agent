@@ -26,5 +26,5 @@ def test_sample_bundle_exports_with_each_theme(theme_path, tmp_path):
     result = export_bundle(ROOT / "specs/bundles/wellness_starter.json", theme, tmp_path)
 
     assert result.manifest_path.exists()
-    assert (result.output_dir / "customer_files/letter/wellness_starter_letter_complete.pdf").exists()
-    assert (result.output_dir / "previews/pngs/00_cover.png").exists()
+    assert (result.output_dir / "exports/pdf/us-letter/wellness_starter_us-letter_complete.pdf").exists()
+    assert (result.output_dir / "exports/png/listing-images/01_hero.png").exists()

@@ -36,7 +36,7 @@ def test_etsy_preflight_accepts_generated_payload_price_without_config_price(tmp
 def test_etsy_preflight_reports_missing_config_and_files(tmp_path):
     payload_path = _draft_payload_path(tmp_path)
     payload = json.loads(payload_path.read_text(encoding="utf-8"))
-    payload["upload_plan"]["digital_files"] = ["customer_files/letter/missing.pdf"]
+    payload["upload_plan"]["digital_files"] = ["exports/pdf/us-letter/missing.pdf"]
     payload_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
 
     result = run_etsy_preflight(payload_path, tmp_path / "preflight", config=EtsyApiConfig("", "", "", "", "", 0))

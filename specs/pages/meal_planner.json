@@ -1,0 +1,42 @@
+{
+  "id": "meal_planner",
+  "page_type": "meal_planner",
+  "title": "Meal Planner",
+  "subtitle": "Plan simple meals, grocery notes, and prep tasks for a smoother week.",
+  "metadata": {
+    "collection": "atelier_aurelia",
+    "collection_label": "Atelier Aurelia"
+  },
+  "sections": [
+    {
+      "id": "weekly_meals",
+      "type": "two_column",
+      "title": "Meals This Week",
+      "weight": 1.35,
+      "fields": {
+        "left_title": "Breakfast + Lunch",
+        "right_title": "Dinner",
+        "line_count": 7
+      }
+    },
+    {
+      "id": "grocery_list",
+      "type": "checkbox_list",
+      "title": "Grocery List",
+      "weight": 1.0,
+      "fields": {
+        "count": 10
+      }
+    },
+    {
+      "id": "prep_notes",
+      "type": "prompt_box",
+      "title": "Prep Notes",
+      "weight": 0.7,
+      "fields": {
+        "prompt": "What can be washed, chopped, cooked, or packed ahead?",
+        "line_count": 4
+      }
+    }
+  ]
+}

@@ -2,39 +2,39 @@
   "id": "muted_luxury",
   "name": "Muted Luxury",
   "colors": {
-    "background": "#FCFBF7",
-    "heading": "#252525",
-    "body": "#3B3934",
-    "muted": "#777066",
-    "accent": "#9B7A3B",
-    "divider": "#D8D0BF",
-    "line": "#C6BDAA",
-    "top_band": "#EDE5D2",
-    "side_band": "#E7E2D7",
+    "background": "#FBF8F1",
+    "heading": "#27231F",
+    "body": "#3D3932",
+    "muted": "#696056",
+    "accent": "#8D7A61",
+    "divider": "#BFB5A7",
+    "line": "#AFA596",
+    "top_band": "#E9E1D2",
+    "side_band": "#DDE6DC",
     "corner_block": "#CDB77E",
     "ornament": "#75652F",
-    "page_rule": "#D4C8AF",
+    "page_rule": "#C9BDAE",
     "section_fill": "#FFFDF8",
-    "section_band": "#F0E8D6",
-    "row_fill": "#F8F5EC",
+    "section_band": "#E9E1D2",
+    "row_fill": "#F6F1E7",
     "checkbox_fill": "#FFFDF8",
     "paper_fill": "#FFFFFF",
-    "label_fill": "#E9DFC7",
-    "prompt_fill": "#F2EBDD"
+    "label_fill": "#E5DBC9",
+    "prompt_fill": "#EFE6D7"
   },
   "typography": {
-    "title_size": "28",
-    "subtitle_size": "10",
-    "section_title_size": "9",
-    "body_size": "9"
+    "title_size": "31",
+    "subtitle_size": "10.5",
+    "section_title_size": "9.5",
+    "body_size": "9.5"
   },
   "spacing": {
-    "page_margin": 54,
-    "header_height": 86,
-    "section_gap": 14
+    "page_margin": 50,
+    "header_height": 92,
+    "section_gap": 16
   },
   "strokes": {
-    "divider": 0.45,
-    "line": 0.28
+    "divider": 0.7,
+    "line": 0.45
   }
 }

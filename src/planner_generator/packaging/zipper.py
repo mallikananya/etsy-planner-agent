@@ -7,8 +7,8 @@ from zipfile import ZIP_DEFLATED, ZipFile
 
 def create_customer_zip(bundle_output_dir: str | Path, customer_files: Iterable[str | Path] | None = None) -> Path:
     bundle_output_dir = Path(bundle_output_dir)
-    customer_dir = bundle_output_dir / "customer_files"
-    zip_dir = customer_dir / "zip"
+    customer_dir = bundle_output_dir / "exports" / "pdf"
+    zip_dir = customer_dir / "customer-zip"
     zip_dir.mkdir(parents=True, exist_ok=True)
     zip_path = zip_dir / f"{bundle_output_dir.name}_customer_files.zip"
 

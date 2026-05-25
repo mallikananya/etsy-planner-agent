@@ -33,4 +33,6 @@ def test_load_component_showcase_bundle():
     bundle = load_bundle_spec(ROOT / "specs/bundles/component_showcase.json")
 
     assert bundle.id == "component_showcase"
-    assert bundle.sequence_repeat == 2
+    assert bundle.sequence_repeat == 1
+    assert len(bundle.pages) == 10
+    assert bundle.metadata["brand_name"] == "Atelier Aurelia"

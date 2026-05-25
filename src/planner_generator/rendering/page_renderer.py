@@ -43,32 +43,26 @@ def _draw_page(canvas: PdfCanvas, page: PageSpec, layout: PageLayout, theme: The
 def _draw_page_frame(canvas: PdfCanvas, layout: PageLayout, theme: Theme) -> None:
     width = layout.page_size.width
     height = layout.page_size.height
-    canvas.rect(0, height - 44, width, 44, fill=theme.color("top_band", "#F4EDE4"))
-    canvas.rect(0, 0, 18, height, fill=theme.color("side_band", "#DDE8DF"))
-    canvas.rect(width - 72, height - 72, 72, 72, fill=theme.color("corner_block", "#F0B7A4"))
-    canvas.line(30, height - 34, width - 92, height - 34, theme.color("accent", "#9A7B64"), 0.9)
-    canvas.polyline(
-        [(width - 68, height - 20), (width - 42, height - 46), (width - 16, height - 20)],
-        theme.color("ornament", "#6D8A77"),
-        1.0,
-    )
+    canvas.rect(0, height - 34, width, 34, fill=theme.color("top_band", "#E9E1D2"))
+    canvas.rect(0, 0, 14, height, fill=theme.color("side_band", "#DDE6DC"))
+    canvas.line(28, height - 33, width - 28, height - 33, theme.color("accent", "#8D7A61"), 1.1)
     canvas.rect(
-        layout.content_bounds.x - 14,
-        layout.content_bounds.y - 16,
-        layout.content_bounds.width + 28,
-        layout.content_bounds.height + 26,
-        stroke=theme.color("page_rule", "#E2D5C6"),
-        stroke_width=0.5,
+        layout.content_bounds.x - 12,
+        layout.content_bounds.y - 14,
+        layout.content_bounds.width + 24,
+        layout.content_bounds.height + 24,
+        stroke=theme.color("page_rule", "#C9BDAE"),
+        stroke_width=0.7,
     )
 
 
 def _draw_header(canvas: PdfCanvas, page: PageSpec, bounds: Rect, theme: Theme) -> None:
-    title_size = float(theme.typography.get("title_size", 26))
-    subtitle_size = float(theme.typography.get("subtitle_size", 10))
+    title_size = float(theme.typography.get("title_size", 30))
+    subtitle_size = float(theme.typography.get("subtitle_size", 10.5))
     title_y = bounds.top - title_size - 4
     canvas.text(page.title.upper(), bounds.x, title_y, title_size, theme.color("heading"), font="serif")
     if page.subtitle:
-        canvas.text(page.subtitle, bounds.x, title_y - 18, subtitle_size, theme.color("muted"), font="sans")
+        canvas.text(page.subtitle, bounds.x, title_y - 20, subtitle_size, theme.color("body"), font="sans")
     collection = page.metadata.get("collection_label") or page.metadata.get("collection")
     if collection:
         canvas.text(str(collection).upper(), bounds.right - 130, bounds.top - 18, 8, theme.color("accent"), font="sans")
@@ -78,7 +72,7 @@ def _draw_header(canvas: PdfCanvas, page: PageSpec, bounds: Rect, theme: Theme) 
         bounds.right,
         bounds.y + 10,
         theme.color("divider"),
-        theme.stroke("divider", 0.5),
+        theme.stroke("divider", 0.7),
     )
 
 
@@ -110,13 +104,13 @@ def _draw_section(canvas: PdfCanvas, section: LayoutSection, theme: Theme) -> No
     spec = section.spec
     title_size = float(theme.typography.get("section_title_size", 10))
     canvas.rect(bounds.x, bounds.y, bounds.width, bounds.height, fill=theme.color("section_fill", "#FBF8F3"))
-    canvas.rect(bounds.x, bounds.y, bounds.width, bounds.height, stroke=theme.color("divider"), stroke_width=0.45)
-    canvas.rect(bounds.x, bounds.top - 26, bounds.width, 26, fill=theme.color("section_band", "#EEF4EE"))
-    canvas.rect(bounds.x, bounds.top - 26, 7, 26, fill=theme.color("accent", "#9A7B64"))
-    canvas.text(spec.title.upper(), bounds.x + 15, bounds.top - 17, title_size, theme.color("heading"), font="sans")
-    canvas.line(bounds.x + 15, bounds.top - 25, bounds.right - 12, bounds.top - 25, theme.color("divider"), 0.3)
+    canvas.rect(bounds.x, bounds.y, bounds.width, bounds.height, stroke=theme.color("divider"), stroke_width=0.7)
+    canvas.rect(bounds.x, bounds.top - 28, bounds.width, 28, fill=theme.color("section_band", "#E9E1D2"))
+    canvas.rect(bounds.x, bounds.top - 28, 8, 28, fill=theme.color("accent", "#8D7A61"))
+    canvas.text(spec.title.upper(), bounds.x + 17, bounds.top - 18, title_size, theme.color("heading"), font="sans")
+    canvas.line(bounds.x + 17, bounds.top - 28, bounds.right - 12, bounds.top - 28, theme.color("divider"), 0.45)
     body = bounds.inset(14)
-    body = Rect(body.x, body.y + 4, body.width, max(0, body.height - 34))
+    body = Rect(body.x, body.y + 4, body.width, max(0, body.height - 38))
 
     if spec.type == "writing_lines":
         _draw_writing_lines(canvas, body, spec, theme)
@@ -147,7 +141,7 @@ def _draw_writing_lines(canvas: PdfCanvas, bounds: Rect, spec: SectionSpec, them
     gap = bounds.height / count
     for index in range(count):
         y = bounds.top - gap * (index + 1)
-        canvas.line(bounds.x, y, bounds.right, y, theme.color("line"), theme.stroke("line", 0.3))
+        canvas.line(bounds.x, y, bounds.right, y, theme.color("line"), theme.stroke("line", 0.45))
 
 
 def _draw_amount_rows(canvas: PdfCanvas, bounds: Rect, spec: SectionSpec, theme: Theme) -> None:
@@ -157,17 +151,17 @@ def _draw_amount_rows(canvas: PdfCanvas, bounds: Rect, spec: SectionSpec, theme:
     total_width = min(bounds.width * 0.2, float(spec.fields.get("total_width", 90)))
     row_height = bounds.height / rows
     header_y = bounds.top - 12
-    canvas.text("ITEM", bounds.x + 6, header_y, 7, theme.color("muted"), font="sans")
-    canvas.text("AMOUNT", bounds.x + label_width + 12, header_y, 7, theme.color("muted"), font="sans")
-    canvas.text("DONE", bounds.right - total_width + 10, header_y, 7, theme.color("muted"), font="sans")
+    canvas.text("ITEM", bounds.x + 6, header_y, 7.5, theme.color("body"), font="sans")
+    canvas.text("AMOUNT", bounds.x + label_width + 12, header_y, 7.5, theme.color("body"), font="sans")
+    canvas.text("DONE", bounds.right - total_width + 10, header_y, 7.5, theme.color("body"), font="sans")
     for index in range(rows):
         y = bounds.top - row_height * (index + 1)
         if index % 2 == 0:
             canvas.rect(bounds.x, y + 2, bounds.width, max(1, row_height - 3), fill=theme.color("row_fill", "#FFFFFF"))
-        canvas.line(bounds.x, y, bounds.right, y, theme.color("line"), 0.25)
-        canvas.line(bounds.x + label_width, y + 3, bounds.x + label_width, y + row_height - 3, theme.color("divider"), 0.25)
-        canvas.line(bounds.right - total_width, y + 3, bounds.right - total_width, y + row_height - 3, theme.color("divider"), 0.25)
-        canvas.rect(bounds.right - total_width + 12, y + row_height / 2 - 4, 8, 8, stroke=theme.color("accent"), fill=theme.color("checkbox_fill"), stroke_width=0.35)
+        canvas.line(bounds.x, y, bounds.right, y, theme.color("line"), 0.4)
+        canvas.line(bounds.x + label_width, y + 3, bounds.x + label_width, y + row_height - 3, theme.color("divider"), 0.35)
+        canvas.line(bounds.right - total_width, y + 3, bounds.right - total_width, y + row_height - 3, theme.color("divider"), 0.35)
+        canvas.rect(bounds.right - total_width + 12, y + row_height / 2 - 4, 8, 8, stroke=theme.color("accent"), fill=theme.color("checkbox_fill"), stroke_width=0.55)
 
 
 def _draw_calendar_grid(canvas: PdfCanvas, bounds: Rect, spec: SectionSpec, theme: Theme) -> None:
@@ -181,14 +175,14 @@ def _draw_calendar_grid(canvas: PdfCanvas, bounds: Rect, spec: SectionSpec, them
     for column, label in enumerate(weekdays[:columns]):
         x = bounds.x + column * cell_width
         canvas.rect(x, bounds.top - header_height, cell_width, header_height, fill=theme.color("label_fill", "#F6E7DF"))
-        canvas.text(label.upper(), x + 5, bounds.top - 12, 7, theme.color("accent"), font="sans")
+        canvas.text(label.upper(), x + 5, bounds.top - 12, 7, theme.color("heading"), font="sans")
     for column in range(columns + 1):
         x = bounds.x + column * cell_width
-        canvas.line(x, bounds.y, x, bounds.top, theme.color("line"), 0.25)
+        canvas.line(x, bounds.y, x, bounds.top, theme.color("line"), 0.4)
     for row in range(weeks + 1):
         y = bounds.y + row * cell_height
-        canvas.line(bounds.x, y, bounds.right, y, theme.color("line"), 0.25)
-    canvas.line(bounds.x, bounds.top - header_height, bounds.right, bounds.top - header_height, theme.color("divider"), 0.4)
+        canvas.line(bounds.x, y, bounds.right, y, theme.color("line"), 0.4)
+    canvas.line(bounds.x, bounds.top - header_height, bounds.right, bounds.top - header_height, theme.color("divider"), 0.6)
 
 
 def _draw_checkbox_list(canvas: PdfCanvas, bounds: Rect, spec: SectionSpec, theme: Theme) -> None:
@@ -200,21 +194,21 @@ def _draw_checkbox_list(canvas: PdfCanvas, bounds: Rect, spec: SectionSpec, them
         y = bounds.top - row_gap * (index + 1) + 6
         if index % 2 == 0:
             canvas.rect(bounds.x - 5, y - 6, bounds.width + 10, row_gap - 3, fill=theme.color("row_fill", "#FFFFFF"))
-        canvas.rect(bounds.x, y, box_size, box_size, stroke=theme.color("accent"), fill=theme.color("checkbox_fill", "#FFF9F5"), stroke_width=0.45)
+        canvas.rect(bounds.x, y, box_size, box_size, stroke=theme.color("accent"), fill=theme.color("checkbox_fill", "#FFF9F5"), stroke_width=0.65)
         if item:
             canvas.text(str(item), bounds.x + 16, y + 1, text_size, theme.color("body"), font="sans")
         else:
-            canvas.line(bounds.x + 16, y + 2, bounds.right, y + 2, theme.color("line"), 0.3)
+            canvas.line(bounds.x + 16, y + 2, bounds.right, y + 2, theme.color("line"), 0.45)
 
 
 def _draw_notes_box(canvas: PdfCanvas, bounds: Rect, spec: SectionSpec, theme: Theme) -> None:
-    canvas.rect(bounds.x, bounds.y, bounds.width, bounds.height, fill=theme.color("paper_fill", "#FFFFFF"), stroke=theme.color("divider"), stroke_width=0.45)
+    canvas.rect(bounds.x, bounds.y, bounds.width, bounds.height, fill=theme.color("paper_fill", "#FFFFFF"), stroke=theme.color("divider"), stroke_width=0.65)
     line_count = int(spec.fields.get("line_count", 0))
     if line_count:
         gap = bounds.height / (line_count + 1)
         for index in range(line_count):
             y = bounds.top - gap * (index + 1)
-            canvas.line(bounds.x + 8, y, bounds.right - 8, y, theme.color("line"), 0.25)
+            canvas.line(bounds.x + 8, y, bounds.right - 8, y, theme.color("line"), 0.45)
 
 
 def _draw_tracker_grid(canvas: PdfCanvas, bounds: Rect, spec: SectionSpec, theme: Theme) -> None:
@@ -227,10 +221,10 @@ def _draw_tracker_grid(canvas: PdfCanvas, bounds: Rect, spec: SectionSpec, theme
     canvas.rect(bounds.x, bounds.y, bounds.width, bounds.height, fill=theme.color("paper_fill", "#FFFFFF"))
     for column in range(columns + 1):
         x = bounds.x + column * cell_width
-        canvas.line(x, bounds.y, x, bounds.top, theme.color("line"), 0.25)
+        canvas.line(x, bounds.y, x, bounds.top, theme.color("line"), 0.4)
     for row in range(rows + 1):
         y = bounds.y + row * cell_height
-        canvas.line(bounds.x, y, bounds.right, y, theme.color("line"), 0.25)
+        canvas.line(bounds.x, y, bounds.right, y, theme.color("line"), 0.4)
     for column in range(columns):
         label = str(column + 1)
         canvas.text(label, bounds.x + column * cell_width + 5, bounds.top - 12, 7, theme.color("muted"), font="sans")
@@ -241,11 +235,11 @@ def _draw_two_column(canvas: PdfCanvas, bounds: Rect, spec: SectionSpec, theme: 
     column_width = (bounds.width - gap) / 2
     left = Rect(bounds.x, bounds.y, column_width, bounds.height)
     right = Rect(bounds.x + column_width + gap, bounds.y, column_width, bounds.height)
-    canvas.line(bounds.x + column_width + gap / 2, bounds.y, bounds.x + column_width + gap / 2, bounds.top, theme.color("divider"), 0.3)
+    canvas.line(bounds.x + column_width + gap / 2, bounds.y, bounds.x + column_width + gap / 2, bounds.top, theme.color("divider"), 0.45)
     for column_bounds, label in [(left, spec.fields.get("left_title", "")), (right, spec.fields.get("right_title", ""))]:
         if label:
             canvas.rect(column_bounds.x, column_bounds.top - 20, column_bounds.width, 18, fill=theme.color("label_fill", "#F6E7DF"))
-            canvas.text(str(label).upper(), column_bounds.x + 7, column_bounds.top - 14, 8, theme.color("accent"), font="sans")
+            canvas.text(str(label).upper(), column_bounds.x + 7, column_bounds.top - 14, 8, theme.color("heading"), font="sans")
         lines_spec = SectionSpec(id=f"{spec.id}_lines", type="writing_lines", title="", fields={"count": spec.fields.get("line_count", 6)})
         _draw_writing_lines(canvas, Rect(column_bounds.x, column_bounds.y, column_bounds.width, column_bounds.height - 18), lines_spec, theme)
 
@@ -272,9 +266,9 @@ def _draw_quadrant_board(canvas: PdfCanvas, bounds: Rect, spec: SectionSpec, the
         Rect(bounds.x + column_width + gap, bounds.y, column_width, row_height),
     ]
     for index, quadrant in enumerate(quadrants):
-        canvas.rect(quadrant.x, quadrant.y, quadrant.width, quadrant.height, fill=theme.color("paper_fill", "#FFFFFF"), stroke=theme.color("divider"), stroke_width=0.35)
+        canvas.rect(quadrant.x, quadrant.y, quadrant.width, quadrant.height, fill=theme.color("paper_fill", "#FFFFFF"), stroke=theme.color("divider"), stroke_width=0.55)
         canvas.rect(quadrant.x, quadrant.top - 18, quadrant.width, 18, fill=theme.color("label_fill", "#F6E7DF"))
-        canvas.text(labels[index].upper(), quadrant.x + 7, quadrant.top - 12, 7, theme.color("accent"), font="sans")
+        canvas.text(labels[index].upper(), quadrant.x + 7, quadrant.top - 12, 7, theme.color("heading"), font="sans")
         line_spec = SectionSpec(id=f"{spec.id}_{index}_lines", type="writing_lines", title="", fields={"count": spec.fields.get("line_count", 4)})
         _draw_writing_lines(canvas, Rect(quadrant.x + 8, quadrant.y + 8, quadrant.width - 16, quadrant.height - 32), line_spec, theme)
 
@@ -290,7 +284,7 @@ def _draw_rating_scale(canvas: PdfCanvas, bounds: Rect, spec: SectionSpec, theme
         gap = (bounds.width - 112) / max(steps - 1, 1)
         for step in range(steps):
             x = start_x + step * gap
-            canvas.rect(x, y, 9, 9, stroke=theme.color("accent"), fill=theme.color("checkbox_fill", "#FFF9F5"), stroke_width=0.4)
+            canvas.rect(x, y, 9, 9, stroke=theme.color("accent"), fill=theme.color("checkbox_fill", "#FFF9F5"), stroke_width=0.6)
 
 
 def _configured_items(spec: SectionSpec, default_count: int) -> Iterable[str]:

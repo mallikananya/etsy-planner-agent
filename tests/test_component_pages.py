@@ -14,7 +14,11 @@ COMPONENT_PAGE_IDS = [
     "cleaning_reset",
     "content_planner",
     "deadline_tracker",
+    "daily_planner",
+    "habit_tracker",
+    "meal_planner",
     "monthly_overview",
+    "notes_page",
     "nervous_system_reset",
     "payday_planner",
     "budget_snapshot",
@@ -22,6 +26,7 @@ COMPONENT_PAGE_IDS = [
     "brain_dump",
     "goal_planner",
     "sunday_reset",
+    "weekly_reset",
     "workout_wellness_tracker",
 ]
 
@@ -41,8 +46,8 @@ def test_component_showcase_bundle_exports(tmp_path):
 
     assert bundle.id == "component_showcase"
     assert sum(page.repeat for page in bundle.pages) * bundle.sequence_repeat == 10
-    assert (result.output_dir / "customer_files/letter/component_showcase_letter_complete.pdf").exists()
-    assert (result.output_dir / "customer_files/a4/010_goal_planner.pdf").exists()
-    assert (result.output_dir / "previews/pngs/05_goal_planner.png").exists()
-    combined_pdf = (result.output_dir / "customer_files/letter/component_showcase_letter_complete.pdf").read_bytes()
+    assert (result.output_dir / "exports/pdf/us-letter/component_showcase_us-letter_complete.pdf").exists()
+    assert (result.output_dir / "exports/pdf/a4/010_notes_page.pdf").exists()
+    assert (result.output_dir / "exports/png/page-previews/05_habit_tracker.png").exists()
+    combined_pdf = (result.output_dir / "exports/pdf/us-letter/component_showcase_us-letter_complete.pdf").read_bytes()
     assert b"/Count 10" in combined_pdf

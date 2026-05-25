@@ -1,0 +1,30 @@
+{
+  "id": "notes_page",
+  "page_type": "notes",
+  "title": "Notes Page",
+  "subtitle": "A refined lined page for lists, reflections, meeting notes, and extra planning space.",
+  "metadata": {
+    "collection": "atelier_aurelia",
+    "collection_label": "Atelier Aurelia"
+  },
+  "sections": [
+    {
+      "id": "notes",
+      "type": "notes_box",
+      "title": "Notes",
+      "weight": 2.3,
+      "fields": {
+        "line_count": 20
+      }
+    },
+    {
+      "id": "next_steps",
+      "type": "checkbox_list",
+      "title": "Next Steps",
+      "weight": 0.7,
+      "fields": {
+        "count": 4
+      }
+    }
+  ]
+}

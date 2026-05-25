@@ -62,12 +62,13 @@ def export_bundle(bundle_path: str | Path, theme: Theme, output_root: str | Path
     primary_customer_files: List[Path] = []
     individual_page_files: List[Path] = []
     for size_id in bundle.paper_sizes:
-        combined_path = output_dir / "customer_files" / size_id / f"{bundle.id}_{size_id}_complete.pdf"
+        size_folder = _pdf_size_folder(size_id)
+        combined_path = output_dir / "exports" / "pdf" / size_folder / f"{bundle.id}_{size_folder}_complete.pdf"
         render_pages_to_pdf(pages, theme, size_id, combined_path)
         generated_files.append(combined_path)
         primary_customer_files.append(combined_path)
 
-        size_dir = output_dir / "customer_files" / size_id
+        size_dir = output_dir / "exports" / "pdf" / size_folder
         for index, page in enumerate(pages, start=1):
             file_name = f"{index:03d}_{page.id}.pdf"
             output_path = size_dir / file_name
@@ -118,6 +119,12 @@ def _load_page_library(pages_dir: Path) -> List[PageSpec]:
     if not pages_dir.exists():
         return []
     return [load_page_spec(path) for path in sorted(pages_dir.resolve().glob("*.json"))]
+
+
+def _pdf_size_folder(size_id: str) -> str:
+    if size_id.lower() == "letter":
+        return "us-letter"
+    return size_id.lower()
 
 
 def _build_manifest(

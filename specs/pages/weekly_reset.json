@@ -1,0 +1,42 @@
+{
+  "id": "weekly_reset",
+  "page_type": "weekly_planner",
+  "title": "Weekly Reset",
+  "subtitle": "Plan the week with priorities, appointments, reset tasks, and a calm closing review.",
+  "metadata": {
+    "collection": "atelier_aurelia",
+    "collection_label": "Atelier Aurelia"
+  },
+  "sections": [
+    {
+      "id": "weekly_priorities",
+      "type": "checkbox_list",
+      "title": "Top Priorities",
+      "weight": 0.85,
+      "fields": {
+        "items": ["Main focus", "Important appointment", "Home reset", "Personal care", "Follow-up"]
+      }
+    },
+    {
+      "id": "week_at_a_glance",
+      "type": "two_column",
+      "title": "Week At A Glance",
+      "weight": 1.15,
+      "fields": {
+        "left_title": "Plans",
+        "right_title": "Reminders",
+        "line_count": 7
+      }
+    },
+    {
+      "id": "weekly_close",
+      "type": "prompt_box",
+      "title": "End Of Week Notes",
+      "weight": 0.85,
+      "fields": {
+        "prompt": "What felt complete, and what needs a softer plan next week?",
+        "line_count": 5
+      }
+    }
+  ]
+}
