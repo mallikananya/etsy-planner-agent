@@ -19,7 +19,7 @@ def test_etsy_preflight_passes_for_complete_payload(tmp_path):
     assert result.output_path.exists()
     assert result.report["ready_for_live_draft"] is True
     assert result.report["errors"] == []
-    assert len(result.report["file_checks"]) == 12
+    assert len(result.report["file_checks"]) == 9
     assert result.report["auto_publish"] is False
 
 

@@ -5,7 +5,8 @@ from contextlib import suppress
 from pathlib import Path
 from typing import Callable, List, Sequence
 
-from planner_generator.planner_specs.models import PageSpec, SectionSpec
+from planner_generator.brand_system import atelier_system
+from planner_generator.planner_specs.models import PageSpec
 from planner_generator.rendering.pdf_canvas import PdfCanvas
 from planner_generator.rendering.png_canvas import PngCanvas, RGB, hex_to_rgb
 from planner_generator.theme_engine.models import Theme
@@ -19,25 +20,20 @@ PDF_HEIGHT = 800
 
 
 def write_product_page_previews(output_dir: str | Path, theme: Theme, pages: Sequence[PageSpec]) -> List[Path]:
-    """Write factual page previews for internal QA and product handoff.
-
-    These images belong to the product pipeline. They intentionally mirror the
-    printable pages and are kept out of the Etsy marketing carousel.
-    """
+    """Write product previews using the same Atelier Aurelia interior language."""
 
     output_dir = Path(output_dir)
     preview_dir = output_dir / "exports" / "png" / "product-page-previews"
     preview_dir.mkdir(parents=True, exist_ok=True)
-
-    preview_files: List[Path] = []
+    files: List[Path] = []
     for index, page in enumerate(_unique_pages(pages)[:PRODUCT_PREVIEW_LIMIT], start=1):
         path = preview_dir / f"{index:02d}_{page.id}.png"
-        _write_pdf_png(path, lambda canvas, page=page: _draw_page_preview(canvas, page, theme), theme)
-        preview_files.append(path)
-    return preview_files
+        _write_pdf_png(path, lambda canvas, page=page: _draw_preview(canvas, page), atelier_system(PDF_WIDTH, PDF_HEIGHT).palette.ivory)
+        files.append(path)
+    return files
 
 
-def _write_pdf_png(path: Path, draw: Callable[[PdfCanvas], None], theme: Theme) -> None:
+def _write_pdf_png(path: Path, draw: Callable[[PdfCanvas], None], fallback: str) -> None:
     temp_pdf = path.with_suffix(".preview.pdf")
     try:
         canvas = PdfCanvas(PDF_WIDTH, PDF_HEIGHT)
@@ -61,66 +57,41 @@ def _write_pdf_png(path: Path, draw: Callable[[PdfCanvas], None], theme: Theme) 
             stderr=subprocess.PIPE,
         )
     except (OSError, subprocess.CalledProcessError):
-        _write_fallback_png(path, theme)
+        _fallback_png(path, fallback)
     finally:
         with suppress(FileNotFoundError):
             temp_pdf.unlink()
 
 
-def _draw_page_preview(canvas: PdfCanvas, page: PageSpec, theme: Theme) -> None:
-    canvas.rect(0, 0, PDF_WIDTH, PDF_HEIGHT, fill=theme.color("listing_background", "#EFE7DA"))
-    canvas.rect(54, 54, PDF_WIDTH - 108, PDF_HEIGHT - 108, fill=theme.color("listing_panel", "#F9F4EC"))
-    _draw_paper(canvas, 284, 92, 432, 614, theme, page, large=True)
-    canvas.text(page.title, 90, 662, 32, theme.color("heading"), font="serif")
+def _draw_preview(canvas: PdfCanvas, page: PageSpec) -> None:
+    system = atelier_system(PDF_WIDTH, PDF_HEIGHT, columns=12, margin=70)
+    p = system.palette
+    g = system.grid
+    canvas.rect(0, 0, PDF_WIDTH, PDF_HEIGHT, fill=p.ivory)
+    canvas.rect(0, 0, PDF_WIDTH, 150, fill=p.oat)
+    canvas.rect(724, 0, 276, PDF_HEIGHT, fill=p.sand)
+    canvas.text(system.brand_name, g.left, 682, 8, p.umber, font="sans")
+    canvas.text(page.title, g.left, 628, 32, p.ink, font="serif")
     if page.subtitle:
-        canvas.text(_short(page.subtitle, 78), 92, 628, 12, theme.color("body"), font="sans")
+        canvas.text(_short(page.subtitle, 72), g.left, 592, 10, p.smoke, font="sans")
+    _draw_sheet(canvas, page, system, 300, 86, 400, 570)
 
 
-def _draw_paper(canvas: PdfCanvas, x: float, y: float, width: float, height: float, theme: Theme, page: PageSpec, large: bool) -> None:
-    canvas.rect(x + 9, y - 9, width, height, fill=theme.color("paper_shadow", "#C8BBAA"))
-    canvas.rect(x, y, width, height, fill="#FFFFFF", stroke=theme.color("divider"), stroke_width=0.35)
-    margin = width * 0.09
-    top = y + height - margin
-    canvas.text(page.title, x + margin, top - 22, max(9, width * 0.07), theme.color("heading"), font="serif")
-    if large and page.subtitle:
-        canvas.text(_short(page.subtitle, 54), x + margin, top - 44, max(5.5, width * 0.025), theme.color("body"), font="sans")
-    canvas.line(x + margin, top - 66, x + width - margin, top - 66, theme.color("divider"), 0.28)
-    section_top = top - 88
+def _draw_sheet(canvas: PdfCanvas, page: PageSpec, system, x: float, y: float, width: float, height: float) -> None:
+    p = system.palette
+    canvas.rect(x + 11, y - 11, width, height, fill=p.stone)
+    canvas.rect(x, y, width, height, fill=p.paper, stroke=p.line, stroke_width=system.hairline)
+    canvas.text(system.brand_name, x + 34, y + height - 36, 6.5, p.umber, font="sans")
+    canvas.text(_short(page.title, 28), x + 34, y + height - 82, 24, p.ink, font="serif")
+    canvas.line(x + 34, y + height - 108, x + width - 34, y + height - 108, p.line, system.hairline)
     section_count = max(1, min(4, len(page.sections)))
-    section_h = (section_top - (y + margin)) / section_count - 9
+    block_h = (height - 150) / section_count
     for index, section in enumerate(page.sections[:section_count]):
-        sy_top = section_top - index * (section_h + 9)
-        canvas.rect(x + margin, sy_top - 16, width - margin * 2, 15, fill=theme.color("section_band", "#F2ECE3"))
-        canvas.text(_short(section.title.lower(), 28), x + margin + 5, sy_top - 11, max(4.5, width * 0.025), theme.color("heading"), font="sans")
-        _draw_marks(canvas, x + margin + 5, sy_top - section_h, width - margin * 2 - 10, max(12, section_h - 25), section, theme)
-
-
-def _draw_marks(canvas: PdfCanvas, x: float, y: float, width: float, height: float, section: SectionSpec, theme: Theme) -> None:
-    line = theme.color("line", "#B5AA9C")
-    if section.type in {"calendar_grid", "tracker_grid"}:
-        columns = 7 if section.type == "calendar_grid" else min(10, int(section.fields.get("columns", 7)))
-        rows = 5 if section.type == "calendar_grid" else min(7, int(section.fields.get("rows", 7)))
-        for col in range(columns + 1):
-            xx = x + width * col / columns
-            canvas.line(xx, y, xx, y + height, line, 0.18)
-        for row in range(rows + 1):
-            yy = y + height * row / rows
-            canvas.line(x, yy, x + width, yy, line, 0.18)
-    elif section.type in {"checkbox_list", "rating_scale"}:
-        for index in range(5):
-            yy = y + height - (index + 1) * (height / 5)
-            canvas.rect(x, yy + 3, 5, 5, stroke=theme.color("accent"), stroke_width=0.25)
-            canvas.line(x + 14, yy + 5, x + width, yy + 5, line, 0.22)
-    elif section.type in {"two_column", "quadrant_board"}:
-        canvas.line(x + width / 2, y, x + width / 2, y + height, theme.color("divider"), 0.18)
-        for index in range(5):
-            yy = y + (index + 1) * height / 6
-            canvas.line(x, yy, x + width * 0.44, yy, line, 0.22)
-            canvas.line(x + width * 0.56, yy, x + width, yy, line, 0.22)
-    else:
-        for index in range(6):
-            yy = y + (index + 1) * height / 7
-            canvas.line(x, yy, x + width, yy, line, 0.22)
+        top = y + height - 132 - index * block_h
+        canvas.text(section.title.upper(), x + 34, top - 11, 6.5, p.umber, font="sans")
+        for row in range(4):
+            yy = top - 34 - row * 18
+            canvas.line(x + 34, yy, x + width - 34, yy, p.line, system.hairline)
 
 
 def _unique_pages(pages: Sequence[PageSpec]) -> List[PageSpec]:
@@ -138,11 +109,10 @@ def _short(value: str, limit: int) -> str:
     return value if len(value) <= limit else value[: limit - 3].rstrip() + "..."
 
 
-def _write_fallback_png(path: Path, theme: Theme) -> None:
-    canvas = PngCanvas(PREVIEW_WIDTH, PREVIEW_HEIGHT, _rgb(theme, "listing_background", "#EFE7DA"))
-    canvas.rect(80, 80, PREVIEW_WIDTH - 160, PREVIEW_HEIGHT - 160, _rgb(theme, "listing_panel", "#F9F4EC"))
+def _fallback_png(path: Path, color: str) -> None:
+    canvas = PngCanvas(PREVIEW_WIDTH, PREVIEW_HEIGHT, _rgb(color))
     canvas.write(path)
 
 
-def _rgb(theme: Theme, key: str, fallback: str) -> RGB:
-    return hex_to_rgb(theme.color(key, fallback))
+def _rgb(color: str) -> RGB:
+    return hex_to_rgb(color)

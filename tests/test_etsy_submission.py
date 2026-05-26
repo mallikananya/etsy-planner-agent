@@ -68,7 +68,7 @@ def test_live_submission_uses_mocked_etsy_transport(tmp_path):
     assert transport.calls[0]["headers"]["x-api-key"] == "api-key:api-secret"
     assert transport.calls[0]["payload"]["type"] == "download"
     assert transport.calls[0]["payload"]["taxonomy_id"] == 1234
-    assert len(transport.multipart_calls) == 12
+    assert len(transport.multipart_calls) == 9
     assert "/images" in transport.multipart_calls[0]["url"]
     assert "/files" in transport.multipart_calls[-1]["url"]
     assert result.report["uploads"]["listing_images"]
@@ -80,7 +80,7 @@ def test_live_submission_uses_mocked_etsy_transport(tmp_path):
     assert "title" in handoff["autofilled_fields"]
     assert "price" in handoff["autofilled_fields"]
     assert "digital PDF files" in handoff["autofilled_fields"]
-    assert handoff["uploaded_assets"]["listing_image_count"] == 10
+    assert handoff["uploaded_assets"]["listing_image_count"] == 7
     assert handoff["uploaded_assets"]["digital_file_count"] == 2
 
 

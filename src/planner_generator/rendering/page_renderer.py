@@ -1,270 +1,260 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable
+from typing import Iterable, List
 
+from planner_generator.brand_system import AtelierAureliaSystem, atelier_system
 from planner_generator.layout_engine.geometry import Rect
-from planner_generator.layout_engine.page_layout import LayoutSection, PageLayout, layout_page
 from planner_generator.layout_engine.page_sizes import get_page_size
 from planner_generator.planner_specs.models import PageSpec, SectionSpec
 from planner_generator.rendering.pdf_canvas import PdfCanvas
 from planner_generator.theme_engine.models import Theme
 
 
+@dataclass(frozen=True)
+class InteriorSection:
+    spec: SectionSpec
+    bounds: Rect
+
+
 def render_page_to_pdf(page: PageSpec, theme: Theme, page_size_id: str, output_path: str | Path) -> None:
     page_size = get_page_size(page_size_id)
-    page_layout = layout_page(page, page_size, theme)
+    system = atelier_system(page_size.width, page_size.height, columns=8, margin=min(page_size.width, page_size.height) * 0.09)
     canvas = PdfCanvas(width=page_size.width, height=page_size.height)
-    _draw_page(canvas, page, page_layout, theme)
+    _draw_page(canvas, page, system)
     canvas.write(output_path)
 
 
 def render_pages_to_pdf(pages: Iterable[PageSpec], theme: Theme, page_size_id: str, output_path: str | Path) -> None:
     page_list = list(pages)
     page_size = get_page_size(page_size_id)
+    system = atelier_system(page_size.width, page_size.height, columns=8, margin=min(page_size.width, page_size.height) * 0.09)
     canvas = PdfCanvas(width=page_size.width, height=page_size.height)
     for index, page in enumerate(page_list):
         if index:
             canvas.add_page()
-        page_layout = layout_page(page, page_size, theme)
-        _draw_page(canvas, page, page_layout, theme, page_number=index + 1, page_count=len(page_list))
+        _draw_page(canvas, page, system, page_number=index + 1, page_count=len(page_list))
     canvas.write(output_path)
 
 
-def _draw_page(canvas: PdfCanvas, page: PageSpec, layout: PageLayout, theme: Theme, page_number: int | None = None, page_count: int | None = None) -> None:
-    canvas.rect(0, 0, layout.page_size.width, layout.page_size.height, fill=theme.color("background", "#FFFFFF"))
-    _draw_page_frame(canvas, layout, theme)
-    _draw_header(canvas, page, layout.header_bounds, theme)
-    for section in layout.sections:
-        _draw_section(canvas, section, theme)
-    _draw_footer(canvas, page, layout, theme, page_number, page_count)
+def _draw_page(canvas: PdfCanvas, page: PageSpec, system: AtelierAureliaSystem, page_number: int | None = None, page_count: int | None = None) -> None:
+    p = system.palette
+    g = system.grid
+    canvas.rect(0, 0, g.width, g.height, fill=p.paper)
+    canvas.rect(0, 0, g.width, 34, fill=p.ivory)
+    canvas.rect(0, g.height - 42, g.width, 42, fill=p.ivory)
+    canvas.line(g.left, g.top - 26, g.right, g.top - 26, p.line, system.hairline)
+    canvas.line(g.left, g.bottom + 26, g.right, g.bottom + 26, p.line, system.hairline)
+    _draw_header(canvas, page, system)
+    for section in _section_layout(page, system):
+        _draw_section(canvas, section, system)
+    _draw_footer(canvas, system, page_number, page_count)
 
 
-def _draw_page_frame(canvas: PdfCanvas, layout: PageLayout, theme: Theme) -> None:
-    bounds = layout.content_bounds
-    canvas.line(bounds.x, bounds.top + 5, bounds.right, bounds.top + 5, theme.color("page_rule", "#D8CFC2"), 0.32)
-    canvas.line(bounds.x, bounds.y - 8, bounds.right, bounds.y - 8, theme.color("page_rule", "#D8CFC2"), 0.25)
-
-
-def _draw_header(canvas: PdfCanvas, page: PageSpec, bounds: Rect, theme: Theme) -> None:
-    title_size = float(theme.typography.get("title_size", 30))
-    subtitle_size = float(theme.typography.get("subtitle_size", 10.5))
-    title_y = bounds.top - title_size - 4
-    canvas.text(page.title, bounds.x, title_y, title_size, theme.color("heading"), font="serif")
+def _draw_header(canvas: PdfCanvas, page: PageSpec, system: AtelierAureliaSystem) -> None:
+    p = system.palette
+    g = system.grid
+    canvas.text(system.brand_name, g.left, g.top - 13, 6.8, p.umber, font="sans")
+    title_size = 24 if len(page.title) > 34 else 29
+    canvas.text(page.title, g.left, g.top - 66, title_size, p.ink, font="serif")
     if page.subtitle:
-        canvas.text(page.subtitle, bounds.x, title_y - 20, subtitle_size, theme.color("body"), font="sans")
-    if page.metadata.get("brand_visible"):
-        collection = page.metadata.get("collection_label") or page.metadata.get("collection")
-        if collection:
-            canvas.text(str(collection).replace("_", " ").upper(), bounds.right - 130, bounds.top - 18, 7, theme.color("muted"), font="sans")
-    canvas.line(
-        bounds.x,
-        bounds.y + 10,
-        bounds.right,
-        bounds.y + 10,
-        theme.color("divider"),
-        theme.stroke("divider", 0.42),
-    )
+        canvas.text(_short(page.subtitle, 78), g.left, g.top - 88, 8.5, p.smoke, font="sans")
+    canvas.text(page.page_type.replace("_", " ").upper(), g.right - 116, g.top - 66, 6.8, p.mist, font="sans")
 
 
-def _draw_footer(
-    canvas: PdfCanvas,
-    page: PageSpec,
-    layout: PageLayout,
-    theme: Theme,
-    page_number: int | None,
-    page_count: int | None,
-) -> None:
-    footer_y = layout.content_bounds.y - 4
-    if page_number is not None and page_count is not None:
-        label = f"PAGE {page_number:02d} / {page_count:02d}"
-        canvas.text(label, layout.content_bounds.right - 70, footer_y, 7, theme.color("muted"), font="sans")
+def _draw_footer(canvas: PdfCanvas, system: AtelierAureliaSystem, page_number: int | None, page_count: int | None) -> None:
+    if page_number is None or page_count is None:
+        return
+    label = f"PAGE {page_number:02d} / {page_count:02d}"
+    canvas.text(label, system.grid.right - 72, system.grid.bottom + 6, 6.8, system.palette.mist, font="sans")
 
 
-def _draw_section(canvas: PdfCanvas, section: LayoutSection, theme: Theme) -> None:
+def _section_layout(page: PageSpec, system: AtelierAureliaSystem) -> List[InteriorSection]:
+    g = system.grid
+    header_bottom = g.top - 122
+    footer_top = g.bottom + 46
+    available = header_bottom - footer_top
+    gap = 14.0
+    total_gap = gap * max(0, len(page.sections) - 1)
+    total_weight = sum(max(section.weight, 0.1) for section in page.sections) or 1
+    y_top = header_bottom
+    sections: List[InteriorSection] = []
+    for section in page.sections:
+        height = max(52.0, (available - total_gap) * max(section.weight, 0.1) / total_weight)
+        bounds = Rect(g.left, y_top - height, g.content_width, height)
+        sections.append(InteriorSection(section, bounds))
+        y_top = bounds.y - gap
+    return sections
+
+
+def _draw_section(canvas: PdfCanvas, section: InteriorSection, system: AtelierAureliaSystem) -> None:
+    p = system.palette
     bounds = section.bounds
     spec = section.spec
-    title_size = float(theme.typography.get("section_title_size", 10))
+    canvas.rect(bounds.x, bounds.y, bounds.width, bounds.height, fill=p.paper, stroke=p.line, stroke_width=system.hairline)
     if spec.title:
-        canvas.rect(bounds.x, bounds.top - 24, bounds.width, 20, fill=theme.color("section_band", "#F2ECE3"))
-        canvas.text(spec.title.lower(), bounds.x + 9, bounds.top - 17, title_size, theme.color("heading"), font="sans")
-        canvas.line(bounds.x, bounds.top - 27, bounds.right, bounds.top - 27, theme.color("divider"), 0.28)
-    body = bounds.inset(10)
-    body = Rect(body.x, body.y + 4, body.width, max(0, body.height - 32))
-
+        canvas.rect(bounds.x, bounds.top - 25, bounds.width, 25, fill=p.ivory)
+        canvas.text(spec.title.upper(), bounds.x + 12, bounds.top - 16, 7.5, p.umber, font="sans")
+        canvas.line(bounds.x + 12, bounds.top - 28, bounds.right - 12, bounds.top - 28, p.line, system.hairline)
+    body = Rect(bounds.x + 14, bounds.y + 12, bounds.width - 28, max(1, bounds.height - 48))
     if spec.type == "writing_lines":
-        _draw_writing_lines(canvas, body, spec, theme)
+        _writing_lines(canvas, body, spec, system)
     elif spec.type == "amount_rows":
-        _draw_amount_rows(canvas, body, spec, theme)
+        _amount_rows(canvas, body, spec, system)
     elif spec.type == "calendar_grid":
-        _draw_calendar_grid(canvas, body, spec, theme)
+        _calendar_grid(canvas, body, spec, system)
     elif spec.type == "checkbox_list":
-        _draw_checkbox_list(canvas, body, spec, theme)
+        _checkbox_list(canvas, body, spec, system)
     elif spec.type == "notes_box":
-        _draw_notes_box(canvas, body, spec, theme)
+        _notes_box(canvas, body, spec, system)
     elif spec.type == "tracker_grid":
-        _draw_tracker_grid(canvas, body, spec, theme)
+        _tracker_grid(canvas, body, spec, system)
     elif spec.type == "two_column":
-        _draw_two_column(canvas, body, spec, theme)
+        _two_column(canvas, body, spec, system)
     elif spec.type == "prompt_box":
-        _draw_prompt_box(canvas, body, spec, theme)
+        _prompt_box(canvas, body, spec, system)
     elif spec.type == "quadrant_board":
-        _draw_quadrant_board(canvas, body, spec, theme)
+        _quadrant_board(canvas, body, spec, system)
     elif spec.type == "rating_scale":
-        _draw_rating_scale(canvas, body, spec, theme)
+        _rating_scale(canvas, body, spec, system)
+    else:
+        _writing_lines(canvas, body, SectionSpec(spec.id, "writing_lines", spec.title, spec.weight, {"count": 5}), system)
 
 
-def _draw_writing_lines(canvas: PdfCanvas, bounds: Rect, spec: SectionSpec, theme: Theme) -> None:
-    count = int(spec.fields.get("count", 6))
-    if count < 1:
-        return
+def _writing_lines(canvas: PdfCanvas, bounds: Rect, spec: SectionSpec, system: AtelierAureliaSystem) -> None:
+    count = max(1, int(spec.fields.get("count", 6)))
     gap = bounds.height / count
     for index in range(count):
         y = bounds.top - gap * (index + 1)
-        canvas.line(bounds.x, y, bounds.right, y, theme.color("line"), theme.stroke("line", 0.45))
+        canvas.line(bounds.x, y, bounds.right, y, system.palette.line, system.hairline)
 
 
-def _draw_amount_rows(canvas: PdfCanvas, bounds: Rect, spec: SectionSpec, theme: Theme) -> None:
+def _amount_rows(canvas: PdfCanvas, bounds: Rect, spec: SectionSpec, system: AtelierAureliaSystem) -> None:
+    p = system.palette
     rows = max(1, int(spec.fields.get("rows", 6)))
-    label_width = min(bounds.width * 0.55, float(spec.fields.get("label_width", 240)))
-    amount_width = min(bounds.width * 0.24, float(spec.fields.get("amount_width", 110)))
-    total_width = min(bounds.width * 0.2, float(spec.fields.get("total_width", 90)))
-    row_height = bounds.height / rows
-    header_y = bounds.top - 12
-    canvas.text(str(spec.fields.get("label_title", "note")).lower(), bounds.x + 6, header_y, 7.5, theme.color("body"), font="sans")
-    canvas.text(str(spec.fields.get("amount_title", "amount")).lower(), bounds.x + label_width + 12, header_y, 7.5, theme.color("body"), font="sans")
-    canvas.text(str(spec.fields.get("total_title", "done")).lower(), bounds.right - total_width + 10, header_y, 7.5, theme.color("body"), font="sans")
+    label_width = bounds.width * 0.55
+    amount_width = bounds.width * 0.24
+    row_h = bounds.height / rows
+    headers = [
+        (str(spec.fields.get("label_title", "note")), bounds.x),
+        (str(spec.fields.get("amount_title", "amount")), bounds.x + label_width + 10),
+        (str(spec.fields.get("total_title", "done")), bounds.x + label_width + amount_width + 20),
+    ]
+    for label, x in headers:
+        canvas.text(label.upper(), x, bounds.top - 10, 6.5, p.mist, font="sans")
     for index in range(rows):
-        y = bounds.top - row_height * (index + 1)
-        if index % 2 == 0:
-            canvas.rect(bounds.x, y + 2, bounds.width, max(1, row_height - 3), fill=theme.color("row_fill", "#FFFFFF"))
-        canvas.line(bounds.x, y, bounds.right, y, theme.color("line"), 0.4)
-        canvas.line(bounds.x + label_width, y + 3, bounds.x + label_width, y + row_height - 3, theme.color("divider"), 0.35)
-        canvas.line(bounds.right - total_width, y + 3, bounds.right - total_width, y + row_height - 3, theme.color("divider"), 0.35)
-        canvas.rect(bounds.right - total_width + 12, y + row_height / 2 - 4, 8, 8, stroke=theme.color("accent"), fill=theme.color("checkbox_fill"), stroke_width=0.55)
+        y = bounds.top - row_h * (index + 1)
+        canvas.line(bounds.x, y, bounds.right, y, p.line, system.hairline)
+        canvas.line(bounds.x + label_width, y + 3, bounds.x + label_width, y + row_h - 3, p.line, system.hairline)
+        canvas.line(bounds.x + label_width + amount_width, y + 3, bounds.x + label_width + amount_width, y + row_h - 3, p.line, system.hairline)
 
 
-def _draw_calendar_grid(canvas: PdfCanvas, bounds: Rect, spec: SectionSpec, theme: Theme) -> None:
+def _calendar_grid(canvas: PdfCanvas, bounds: Rect, spec: SectionSpec, system: AtelierAureliaSystem) -> None:
+    p = system.palette
     weeks = max(4, min(6, int(spec.fields.get("weeks", 6))))
     weekdays = [str(day) for day in spec.fields.get("weekdays", ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"])]
-    columns = 7
-    header_height = 18.0
-    cell_width = bounds.width / columns
-    cell_height = max(1, (bounds.height - header_height) / weeks)
-    canvas.rect(bounds.x, bounds.y, bounds.width, bounds.height, fill=theme.color("paper_fill", "#FFFFFF"))
-    for column, label in enumerate(weekdays[:columns]):
-        x = bounds.x + column * cell_width
-        canvas.rect(x, bounds.top - header_height, cell_width, header_height, fill=theme.color("label_fill", "#F6E7DF"))
-        canvas.text(label.upper(), x + 5, bounds.top - 12, 7, theme.color("heading"), font="sans")
-    for column in range(columns + 1):
-        x = bounds.x + column * cell_width
-        canvas.line(x, bounds.y, x, bounds.top, theme.color("line"), 0.4)
+    header_h = 18.0
+    cell_w = bounds.width / 7
+    cell_h = (bounds.height - header_h) / weeks
+    for col, label in enumerate(weekdays[:7]):
+        x = bounds.x + col * cell_w
+        canvas.text(label.upper(), x + 5, bounds.top - 12, 6.4, p.umber, font="sans")
+    for column in range(8):
+        x = bounds.x + column * cell_w
+        canvas.line(x, bounds.y, x, bounds.top - header_h, p.line, system.hairline)
     for row in range(weeks + 1):
-        y = bounds.y + row * cell_height
-        canvas.line(bounds.x, y, bounds.right, y, theme.color("line"), 0.4)
-    canvas.line(bounds.x, bounds.top - header_height, bounds.right, bounds.top - header_height, theme.color("divider"), 0.6)
+        y = bounds.y + row * cell_h
+        canvas.line(bounds.x, y, bounds.right, y, p.line, system.hairline)
+    canvas.line(bounds.x, bounds.top - header_h, bounds.right, bounds.top - header_h, p.line, system.fine_rule)
 
 
-def _draw_checkbox_list(canvas: PdfCanvas, bounds: Rect, spec: SectionSpec, theme: Theme) -> None:
-    items = list(_configured_items(spec, default_count=int(spec.fields.get("count", 6))))
-    row_gap = min(26.0, bounds.height / max(len(items), 1))
-    box_size = 8.0
-    text_size = float(theme.typography.get("body_size", 9))
+def _checkbox_list(canvas: PdfCanvas, bounds: Rect, spec: SectionSpec, system: AtelierAureliaSystem) -> None:
+    p = system.palette
+    items = list(_configured_items(spec, int(spec.fields.get("count", 6))))
+    row_h = min(25.0, bounds.height / max(len(items), 1))
     for index, item in enumerate(items):
-        y = bounds.top - row_gap * (index + 1) + 6
-        if index % 2 == 0:
-            canvas.rect(bounds.x - 5, y - 6, bounds.width + 10, row_gap - 3, fill=theme.color("row_fill", "#FFFFFF"))
-        canvas.rect(bounds.x, y, box_size, box_size, stroke=theme.color("accent"), fill=theme.color("checkbox_fill", "#FFF9F5"), stroke_width=0.65)
+        y = bounds.top - row_h * (index + 1) + 6
+        canvas.rect(bounds.x, y, 7, 7, stroke=p.taupe, fill=p.paper, stroke_width=system.fine_rule)
         if item:
-            canvas.text(str(item), bounds.x + 16, y + 1, text_size, theme.color("body"), font="sans")
+            canvas.text(str(item), bounds.x + 17, y + 1, 8.5, p.smoke, font="sans")
         else:
-            canvas.line(bounds.x + 16, y + 2, bounds.right, y + 2, theme.color("line"), 0.45)
+            canvas.line(bounds.x + 17, y + 2, bounds.right, y + 2, p.line, system.hairline)
 
 
-def _draw_notes_box(canvas: PdfCanvas, bounds: Rect, spec: SectionSpec, theme: Theme) -> None:
-    line_count = int(spec.fields.get("line_count", 0))
-    if line_count:
-        gap = bounds.height / (line_count + 1)
-        for index in range(line_count):
-            y = bounds.top - gap * (index + 1)
-            canvas.line(bounds.x + 8, y, bounds.right - 8, y, theme.color("line"), 0.38)
+def _notes_box(canvas: PdfCanvas, bounds: Rect, spec: SectionSpec, system: AtelierAureliaSystem) -> None:
+    count = int(spec.fields.get("line_count", 0)) or 7
+    _writing_lines(canvas, bounds, SectionSpec(spec.id, "writing_lines", spec.title, spec.weight, {"count": count}), system)
 
 
-def _draw_tracker_grid(canvas: PdfCanvas, bounds: Rect, spec: SectionSpec, theme: Theme) -> None:
-    rows = int(spec.fields.get("rows", 7))
-    columns = int(spec.fields.get("columns", 7))
-    rows = max(1, rows)
-    columns = max(1, columns)
-    cell_width = bounds.width / columns
-    cell_height = bounds.height / rows
-    canvas.rect(bounds.x, bounds.y, bounds.width, bounds.height, fill=theme.color("paper_fill", "#FFFFFF"))
-    for column in range(columns + 1):
-        x = bounds.x + column * cell_width
-        canvas.line(x, bounds.y, x, bounds.top, theme.color("line"), 0.4)
+def _tracker_grid(canvas: PdfCanvas, bounds: Rect, spec: SectionSpec, system: AtelierAureliaSystem) -> None:
+    p = system.palette
+    rows = max(1, int(spec.fields.get("rows", 7)))
+    columns = max(1, int(spec.fields.get("columns", 7)))
+    cell_w = bounds.width / columns
+    cell_h = bounds.height / rows
+    for col in range(columns + 1):
+        x = bounds.x + col * cell_w
+        canvas.line(x, bounds.y, x, bounds.top, p.line, system.hairline)
     for row in range(rows + 1):
-        y = bounds.y + row * cell_height
-        canvas.line(bounds.x, y, bounds.right, y, theme.color("line"), 0.4)
-    for column in range(columns):
-        label = str(column + 1)
-        canvas.text(label, bounds.x + column * cell_width + 5, bounds.top - 12, 7, theme.color("muted"), font="sans")
+        y = bounds.y + row * cell_h
+        canvas.line(bounds.x, y, bounds.right, y, p.line, system.hairline)
+    for col in range(columns):
+        canvas.text(str(col + 1), bounds.x + col * cell_w + 4, bounds.top - 10, 6.2, p.mist, font="sans")
 
 
-def _draw_two_column(canvas: PdfCanvas, bounds: Rect, spec: SectionSpec, theme: Theme) -> None:
-    gap = 16.0
-    column_width = (bounds.width - gap) / 2
-    left = Rect(bounds.x, bounds.y, column_width, bounds.height)
-    right = Rect(bounds.x + column_width + gap, bounds.y, column_width, bounds.height)
-    canvas.line(bounds.x + column_width + gap / 2, bounds.y, bounds.x + column_width + gap / 2, bounds.top, theme.color("divider"), 0.45)
-    for column_bounds, label in [(left, spec.fields.get("left_title", "")), (right, spec.fields.get("right_title", ""))]:
+def _two_column(canvas: PdfCanvas, bounds: Rect, spec: SectionSpec, system: AtelierAureliaSystem) -> None:
+    p = system.palette
+    gap = 18.0
+    width = (bounds.width - gap) / 2
+    canvas.line(bounds.x + width + gap / 2, bounds.y, bounds.x + width + gap / 2, bounds.top, p.line, system.hairline)
+    for offset, label in [(0, spec.fields.get("left_title", "")), (width + gap, spec.fields.get("right_title", ""))]:
+        col = Rect(bounds.x + offset, bounds.y, width, bounds.height)
         if label:
-            canvas.rect(column_bounds.x, column_bounds.top - 20, column_bounds.width, 18, fill=theme.color("label_fill", "#F6E7DF"))
-            canvas.text(str(label).lower(), column_bounds.x + 7, column_bounds.top - 14, 8, theme.color("heading"), font="sans")
-        lines_spec = SectionSpec(id=f"{spec.id}_lines", type="writing_lines", title="", fields={"count": spec.fields.get("line_count", 6)})
-        _draw_writing_lines(canvas, Rect(column_bounds.x, column_bounds.y, column_bounds.width, column_bounds.height - 18), lines_spec, theme)
+            canvas.text(str(label).upper(), col.x, col.top - 10, 6.8, p.umber, font="sans")
+        _writing_lines(canvas, Rect(col.x, col.y, col.width, col.height - 20), SectionSpec(spec.id, "writing_lines", "", 1, {"count": spec.fields.get("line_count", 6)}), system)
 
 
-def _draw_prompt_box(canvas: PdfCanvas, bounds: Rect, spec: SectionSpec, theme: Theme) -> None:
+def _prompt_box(canvas: PdfCanvas, bounds: Rect, spec: SectionSpec, system: AtelierAureliaSystem) -> None:
+    p = system.palette
     prompt = str(spec.fields.get("prompt", ""))
-    canvas.rect(bounds.x, bounds.top - 30, bounds.width, 30, fill=theme.color("prompt_fill", "#F6E7DF"))
+    canvas.rect(bounds.x, bounds.top - 28, bounds.width, 28, fill=p.ivory, stroke=p.line, stroke_width=system.hairline)
     if prompt:
-        canvas.text(prompt, bounds.x + 10, bounds.top - 20, float(theme.typography.get("body_size", 9)), theme.color("heading"), font="sans")
-    line_spec = SectionSpec(id=f"{spec.id}_lines", type="writing_lines", title="", fields={"count": spec.fields.get("line_count", 5)})
-    _draw_writing_lines(canvas, Rect(bounds.x + 8, bounds.y + 4, bounds.width - 16, max(0, bounds.height - 42)), line_spec, theme)
+        canvas.text(_short(prompt, 72), bounds.x + 10, bounds.top - 18, 8, p.ink, font="sans")
+    _writing_lines(canvas, Rect(bounds.x + 6, bounds.y, bounds.width - 12, bounds.height - 40), SectionSpec(spec.id, "writing_lines", "", 1, {"count": spec.fields.get("line_count", 5)}), system)
 
 
-def _draw_quadrant_board(canvas: PdfCanvas, bounds: Rect, spec: SectionSpec, theme: Theme) -> None:
+def _quadrant_board(canvas: PdfCanvas, bounds: Rect, spec: SectionSpec, system: AtelierAureliaSystem) -> None:
+    p = system.palette
     labels = [str(label) for label in spec.fields.get("labels", ["Top Left", "Top Right", "Bottom Left", "Bottom Right"])]
     labels = (labels + ["", "", "", ""])[:4]
-    gap = 12.0
-    column_width = (bounds.width - gap) / 2
-    row_height = (bounds.height - gap) / 2
+    gap = 14.0
+    width = (bounds.width - gap) / 2
+    height = (bounds.height - gap) / 2
     quadrants = [
-        Rect(bounds.x, bounds.y + row_height + gap, column_width, row_height),
-        Rect(bounds.x + column_width + gap, bounds.y + row_height + gap, column_width, row_height),
-        Rect(bounds.x, bounds.y, column_width, row_height),
-        Rect(bounds.x + column_width + gap, bounds.y, column_width, row_height),
+        Rect(bounds.x, bounds.y + height + gap, width, height),
+        Rect(bounds.x + width + gap, bounds.y + height + gap, width, height),
+        Rect(bounds.x, bounds.y, width, height),
+        Rect(bounds.x + width + gap, bounds.y, width, height),
     ]
     for index, quadrant in enumerate(quadrants):
-        canvas.rect(quadrant.x, quadrant.top - 18, quadrant.width, 18, fill=theme.color("label_fill", "#F6E7DF"))
-        canvas.text(labels[index].lower(), quadrant.x + 7, quadrant.top - 12, 7, theme.color("heading"), font="sans")
-        canvas.line(quadrant.x, quadrant.y, quadrant.x, quadrant.top, theme.color("divider"), 0.25)
-        canvas.line(quadrant.right, quadrant.y, quadrant.right, quadrant.top, theme.color("divider"), 0.25)
-        line_spec = SectionSpec(id=f"{spec.id}_{index}_lines", type="writing_lines", title="", fields={"count": spec.fields.get("line_count", 4)})
-        _draw_writing_lines(canvas, Rect(quadrant.x + 8, quadrant.y + 8, quadrant.width - 16, quadrant.height - 32), line_spec, theme)
+        canvas.text(labels[index].upper(), quadrant.x, quadrant.top - 10, 6.5, p.umber, font="sans")
+        _writing_lines(canvas, Rect(quadrant.x, quadrant.y, quadrant.width, quadrant.height - 22), SectionSpec(spec.id, "writing_lines", "", 1, {"count": spec.fields.get("line_count", 4)}), system)
 
 
-def _draw_rating_scale(canvas: PdfCanvas, bounds: Rect, spec: SectionSpec, theme: Theme) -> None:
+def _rating_scale(canvas: PdfCanvas, bounds: Rect, spec: SectionSpec, system: AtelierAureliaSystem) -> None:
+    p = system.palette
     labels = [str(item) for item in spec.fields.get("labels", ["Energy", "Mood", "Focus", "Stress"])]
-    steps = int(spec.fields.get("steps", 5))
-    row_gap = bounds.height / max(len(labels), 1)
+    steps = max(2, int(spec.fields.get("steps", 5)))
+    row_h = bounds.height / max(len(labels), 1)
     for index, label in enumerate(labels):
-        y = bounds.top - row_gap * (index + 1) + 10
-        canvas.text(label, bounds.x, y + 3, 8, theme.color("body"), font="sans")
-        start_x = bounds.x + 92
-        gap = (bounds.width - 112) / max(steps - 1, 1)
+        y = bounds.top - row_h * (index + 1) + 10
+        canvas.text(label, bounds.x, y + 2, 8, p.smoke, font="sans")
+        start = bounds.x + 90
+        gap = (bounds.width - 110) / (steps - 1)
         for step in range(steps):
-            x = start_x + step * gap
-            canvas.rect(x, y, 9, 9, stroke=theme.color("accent"), fill=theme.color("checkbox_fill", "#FFF9F5"), stroke_width=0.6)
+            x = start + step * gap
+            canvas.rect(x, y, 8, 8, stroke=p.taupe, fill=p.paper, stroke_width=system.fine_rule)
 
 
 def _configured_items(spec: SectionSpec, default_count: int) -> Iterable[str]:
@@ -272,3 +262,7 @@ def _configured_items(spec: SectionSpec, default_count: int) -> Iterable[str]:
     if items:
         return [str(item) for item in items]
     return ["" for _ in range(default_count)]
+
+
+def _short(value: str, limit: int) -> str:
+    return value if len(value) <= limit else value[: limit - 3].rstrip() + "..."

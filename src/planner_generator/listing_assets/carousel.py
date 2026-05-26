@@ -4,8 +4,9 @@ import subprocess
 from contextlib import suppress
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, List, Sequence
+from typing import Callable, Iterable, List, Sequence
 
+from planner_generator.brand_system import AtelierAureliaSystem, Palette, atelier_system
 from planner_generator.market_intelligence.models import DifferentiationBrief, ListingUpgradePath, NicheBrief, ProductConcept
 from planner_generator.planner_specs.models import BundleSpec, PageSpec
 from planner_generator.rendering.pdf_canvas import PdfCanvas
@@ -22,8 +23,7 @@ PDF_HEIGHT = 800
 @dataclass(frozen=True)
 class CarouselSlide:
     filename: str
-    template: str
-    purpose: str
+    strategy: str
     draw: Callable[[PdfCanvas], None]
 
 
@@ -37,27 +37,17 @@ def write_etsy_listing_carousel(
     differentiation: DifferentiationBrief | None = None,
     listing_upgrade_path: ListingUpgradePath | None = None,
 ) -> List[Path]:
-    """Write the dedicated Etsy marketing carousel.
-
-    These are campaign graphics, not product previews. The templates use their
-    own composition rules, copy hierarchy, mockups, and feature framing so the
-    listing sells identity and transformation instead of merely screenshotting
-    planner pages.
-    """
-
     output_dir = Path(output_dir)
     listing_dir = output_dir / "exports" / "png" / "listing-images"
     listing_dir.mkdir(parents=True, exist_ok=True)
-
     context = _CampaignContext(bundle, pages, market_brief, product_concept, differentiation, listing_upgrade_path)
-    slides = _build_carousel(context, theme)
-
-    listing_files: List[Path] = []
-    for slide in slides:
+    system = atelier_system(PDF_WIDTH, PDF_HEIGHT, columns=12, margin=58)
+    files: List[Path] = []
+    for slide in _slides(context, system):
         path = listing_dir / slide.filename
-        _write_pdf_png(path, slide.draw, theme)
-        listing_files.append(path)
-    return listing_files
+        _write_pdf_png(path, slide.draw, system.palette)
+        files.append(path)
+    return files
 
 
 class _CampaignContext:
@@ -80,61 +70,31 @@ class _CampaignContext:
     @property
     def product_name(self) -> str:
         if self.product_concept and self.product_concept.product_name:
-            return self.product_concept.product_name
-        return self.bundle.name
+            return _clean_name(self.product_concept.product_name, self.bundle.name)
+        return _clean_name(self.bundle.name, self.bundle.name)
 
     @property
-    def campaign_name(self) -> str:
-        source = self.product_name
-        if "," in source or " pdf" in source.lower() or " instant download" in source.lower():
-            source = self.bundle.name
-        return _clean_campaign_name(source)
-
-    @property
-    def audience(self) -> str:
-        if self.product_concept and self.product_concept.buyer_persona:
-            return self.product_concept.buyer_persona
-        if self.market_brief and self.market_brief.audience:
-            return self.market_brief.audience
-        return "ambitious women building softer routines"
-
-    @property
-    def promise(self) -> str:
-        if self.product_concept and self.product_concept.promise:
-            return self.product_concept.promise
-        if self.market_brief and self.market_brief.angle:
-            return self.market_brief.angle
-        return "gentle structure, calm rituals, and a more intentional week"
+    def page_count(self) -> int:
+        return int(self.bundle.metadata.get("page_count") or len(self.pages) or 0)
 
     @property
     def page_titles(self) -> List[str]:
-        titles: List[str] = []
-        seen = set()
-        for page in self.pages:
-            key = page.title.lower()
-            if key in seen:
-                continue
-            titles.append(page.title)
-            seen.add(key)
-        return titles
+        return _unique(page.title for page in self.pages)
 
 
-def _build_carousel(context: _CampaignContext, theme: Theme) -> List[CarouselSlide]:
+def _slides(context: _CampaignContext, system: AtelierAureliaSystem) -> List[CarouselSlide]:
     return [
-        CarouselSlide("01_hero_thumbnail.png", "hero_thumbnail", "Stop scrolling on Etsy mobile", lambda canvas: _draw_hero_thumbnail(canvas, context, theme)),
-        CarouselSlide("02_features_slide.png", "features", "Editorial feature callouts", lambda canvas: _draw_features_slide(canvas, context, theme)),
-        CarouselSlide("03_yearly_monthly_planning.png", "page_category", "Yearly and monthly page categories", lambda canvas: _draw_category_slide(canvas, context, theme, "Plan your seasons softly", "Yearly, monthly, and big-picture pages for quiet clarity.", ["year", "month", "goal", "overview"], 0)),
-        CarouselSlide("04_weekly_routines.png", "page_category", "Weekly pages and routines", lambda canvas: _draw_category_slide(canvas, context, theme, "Routines that feel romantic", "Weekly resets, morning rituals, and tiny habits with room to breathe.", ["week", "routine", "ritual", "habit", "reset"], 1)),
-        CarouselSlide("05_journaling_wellness.png", "page_category", "Journaling and wellness pages", lambda canvas: _draw_category_slide(canvas, context, theme, "Wellness without the pressure", "Reflection, self-care, mood, meals, movement, and softer check-ins.", ["journal", "wellness", "mood", "care", "meal", "reflection"], 2)),
-        CarouselSlide("06_transformation_identity.png", "transformation", "Emotional outcome and identity", lambda canvas: _draw_transformation_slide(canvas, context, theme)),
-        CarouselSlide("07_cover_options.png", "cover_options", "Alternate cover concepts", lambda canvas: _draw_cover_options_slide(canvas, context, theme)),
-        CarouselSlide("08_whats_included.png", "value_stack", "Abundance and value", lambda canvas: _draw_whats_included_slide(canvas, context, theme)),
-        CarouselSlide("09_device_print_compatibility.png", "compatibility", "Device and print compatibility", lambda canvas: _draw_compatibility_slide(canvas, context, theme)),
-        CarouselSlide("10_soft_life_story.png", "identity_story", "Final aspirational closer", lambda canvas: _draw_identity_story_slide(canvas, context, theme)),
+        CarouselSlide("01_thumbnail.png", "Large product proof and emotional click promise.", lambda canvas: _hero(canvas, context, system)),
+        CarouselSlide("02_features.png", "Central mockup with conversion callouts.", lambda canvas: _features(canvas, context, system)),
+        CarouselSlide("03_interior_pages.png", "Abundant visible page previews.", lambda canvas: _interiors(canvas, context, system)),
+        CarouselSlide("04_transformation.png", "Identity transformation with planner proof.", lambda canvas: _transformation(canvas, context, system)),
+        CarouselSlide("05_cover_options.png", "Luxury stationery cover collection.", lambda canvas: _covers(canvas, context, system)),
+        CarouselSlide("06_whats_included.png", "Fast value comprehension and abundance.", lambda canvas: _included(canvas, context, system)),
+        CarouselSlide("07_device_compatibility.png", "Premium digital and print compatibility.", lambda canvas: _compatibility(canvas, context, system)),
     ]
 
 
-def _write_pdf_png(path: Path, draw: Callable[[PdfCanvas], None], theme: Theme) -> None:
+def _write_pdf_png(path: Path, draw: Callable[[PdfCanvas], None], palette: Palette) -> None:
     temp_pdf = path.with_suffix(".preview.pdf")
     try:
         canvas = PdfCanvas(PDF_WIDTH, PDF_HEIGHT)
@@ -158,368 +118,384 @@ def _write_pdf_png(path: Path, draw: Callable[[PdfCanvas], None], theme: Theme) 
             stderr=subprocess.PIPE,
         )
     except (OSError, subprocess.CalledProcessError):
-        _write_fallback_png(path, theme)
+        _fallback_png(path, palette)
     finally:
         with suppress(FileNotFoundError):
             temp_pdf.unlink()
 
 
-def _draw_hero_thumbnail(canvas: PdfCanvas, context: _CampaignContext, theme: Theme) -> None:
-    palette = _palette(theme)
-    _draw_luxury_background(canvas, palette)
-    canvas.text("FOR THE WOMAN YOU ARE BECOMING", 95, 690, 11, palette.muted, font="sans")
-    _headline(canvas, ["Create a life", "that feels softer"], 94, 610, 47, palette.heading)
-    canvas.text(_short(context.campaign_name, 42), 98, 485, 18, palette.body, font="serif")
-    _callout_row(canvas, 98, 430, ["Printable PDF", "Tablet friendly", f"{len(context.pages)} pages"], palette)
-    _draw_ipad_mockup(canvas, 560, 170, 305, 430, palette, "Soft Life", "planning system")
-    _draw_layered_spreads(canvas, 430, 115, palette, ["Routines", "Wellness", "Reflection"], scale=1.06)
-    canvas.text("Romanticize your routines", 98, 155, 16, palette.heading, font="serif")
-    canvas.text("Gentle structure for ambitious women", 100, 128, 11, palette.body, font="sans")
+def _hero(canvas: PdfCanvas, context: _CampaignContext, system: AtelierAureliaSystem) -> None:
+    p = system.palette
+    _photo_campaign_background(canvas, system, p.oat)
+    canvas.text("2026", 486, 710, 18, "#F8F1E8", font="serif")
+    _tracking_headline(canvas, "SOFT LIFE PLANNER", 230, 666, 36, p.umber)
+    canvas.text("Romanticize your routines", 366, 628, 18, p.umber, font="serif")
+    canvas.text("Digital + printable wellness planner", 344, 602, 11, p.umber, font="sans")
+    _fan_pages(canvas, system, 402, 130, ["Morning Ritual", "Habit System", "Weekly Reset"], 1.05)
+    _device(canvas, system, 456, 166, 416, 440, "daily", "Daily Ritual")
+    _device(canvas, system, 170, 168, 320, 434, "cover", "Atelier")
+    _sales_badge(canvas, system, 78, 556, f"{context.page_count or 48} pages")
+    _sales_badge(canvas, system, 78, 508, "iPad PDF")
+    _sales_badge(canvas, system, 78, 460, "printable")
+    canvas.text("A softer system for routines, wellness, habits, and reflection.", 228, 96, 13, p.umber, font="serif")
+    _brand(canvas, system, 442, 58)
 
 
-def _draw_features_slide(canvas: PdfCanvas, context: _CampaignContext, theme: Theme) -> None:
-    palette = _palette(theme)
-    _draw_luxury_background(canvas, palette)
-    canvas.text("FEATURES", 96, 690, 11, palette.muted, font="sans")
-    _headline(canvas, ["Everything your calm", "routine needs"], 94, 622, 39, palette.heading)
-    features = [
-        ("Clean printable PDFs", "US Letter and A4 files made for easy home printing."),
-        ("Tablet-friendly planning", "Designed to feel elevated on iPad and digital annotation apps."),
-        ("Intentional categories", "Routines, wellness, reflection, notes, habits, meals, and more."),
-        ("Soft editorial design", "Warm neutrals, generous spacing, and calm visual hierarchy."),
+def _features(canvas: PdfCanvas, context: _CampaignContext, system: AtelierAureliaSystem) -> None:
+    p = system.palette
+    _photo_campaign_background(canvas, system, p.sand)
+    canvas.text("Main features", 386, 692, 31, p.umber, font="serif")
+    canvas.text("Everything you need to plan gently, consistently, beautifully.", 290, 658, 12, p.umber, font="sans")
+    _device(canvas, system, 318, 144, 370, 470, "daily", "Soft Life")
+    _marketing_page(canvas, system, 222, 160, 132, 190, "Routine", dense=True, accent=1)
+    _marketing_page(canvas, system, 654, 180, 132, 190, "Reflection", dense=True, accent=2)
+    callouts = [
+        ("Hyperlinked navigation|dated planning rhythm", 86, 548, 336, 514),
+        ("Wellness pages|routines + reflection", 724, 548, 670, 510),
+        ("GoodNotes ready|Notability compatible", 82, 392, 335, 376),
+        ("US Letter + A4|printable PDFs", 720, 388, 670, 356),
+        ("Individual pages|flexible printing", 96, 232, 338, 248),
+        ("Luxury neutral look|cohesive brand system", 710, 234, 668, 258),
     ]
-    _feature_cards(canvas, 88, 385, features, palette)
-    _draw_ipad_mockup(canvas, 640, 115, 250, 350, palette, "Calm", "dashboard")
+    for text, tx, ty, lx, ly in callouts:
+        _callout(canvas, system, text, tx, ty, lx, ly)
+    _brand(canvas, system, 438, 66)
 
 
-def _draw_category_slide(canvas: PdfCanvas, context: _CampaignContext, theme: Theme, headline: str, subhead: str, keywords: Sequence[str], offset: int) -> None:
-    palette = _palette(theme)
-    _draw_luxury_background(canvas, palette)
-    canvas.text("PLANNER PAGES", 95, 690, 11, palette.muted, font="sans")
-    _headline(canvas, _split_headline(headline), 94, 625, 39, palette.heading)
-    canvas.text(_short(subhead, 78), 98, 552, 12, palette.body, font="sans")
-    titles = _category_titles(context.page_titles, keywords, offset)
-    _draw_magazine_stack(canvas, 570, 120, palette, titles[:4])
-    _draw_editorial_list(canvas, 92, 356, titles[:6], palette)
-    _draw_mini_scene(canvas, 95, 95, palette)
-
-
-def _draw_transformation_slide(canvas: PdfCanvas, context: _CampaignContext, theme: Theme) -> None:
-    palette = _palette(theme)
-    _draw_luxury_background(canvas, palette)
-    canvas.text("TRANSFORMATION", 95, 690, 11, palette.muted, font="sans")
-    _headline(canvas, ["Your soft life", "starts here"], 94, 614, 48, palette.heading)
-    canvas.text(_short(context.promise, 86), 98, 520, 12, palette.body, font="sans")
-    before_after = [
-        ("Before", "scattered tabs, heavy lists, starting over every Monday"),
-        ("After", "calm rhythms, visible priorities, routines that feel like care"),
+def _interiors(canvas: PdfCanvas, context: _CampaignContext, system: AtelierAureliaSystem) -> None:
+    p = system.palette
+    _photo_campaign_background(canvas, system, p.oat)
+    _tracking_headline(canvas, "INSIDE THE PLANNER", 218, 686, 25, p.umber)
+    canvas.text("Routines, wellness, reflection, habits, meals, movement, and notes.", 214, 652, 13, p.umber, font="serif")
+    titles = _page_mix(context.page_titles)
+    positions = [
+        (70, 390, 176, 246, -8),
+        (258, 408, 180, 252, 3),
+        (452, 398, 180, 252, -2),
+        (646, 382, 176, 246, 7),
+        (118, 112, 206, 292, 4),
+        (386, 100, 212, 302, -5),
+        (660, 112, 206, 292, 3),
     ]
-    for index, (label, body) in enumerate(before_after):
-        y = 372 - index * 132
-        fill = palette.paper if index else palette.panel
-        canvas.rect(100, y, 385, 88, fill=fill, stroke=palette.divider, stroke_width=0.25)
-        canvas.text(label.upper(), 124, y + 54, 10, palette.muted, font="sans")
-        canvas.text(_short(body, 60), 124, y + 26, 14, palette.heading, font="serif")
-    _draw_layered_spreads(canvas, 585, 150, palette, ["Calm", "Rituals", "Energy"], scale=1.22)
-    canvas.text("Plan for the woman you are becoming", 575, 612, 23, palette.heading, font="serif")
+    for index, (x, y, w, h, tilt) in enumerate(positions):
+        _marketing_page(canvas, system, x, y, w, h, titles[index], dense=True, accent=index % 3)
+    _sales_badge(canvas, system, 78, 66, "page library")
+    _sales_badge(canvas, system, 318, 66, "routine based")
+    _sales_badge(canvas, system, 568, 66, "print + digital")
 
 
-def _draw_cover_options_slide(canvas: PdfCanvas, context: _CampaignContext, theme: Theme) -> None:
-    palette = _palette(theme)
-    _draw_luxury_background(canvas, palette)
-    canvas.text("COVER OPTIONS", 95, 690, 11, palette.muted, font="sans")
-    _headline(canvas, ["Choose the mood", "of your season"], 94, 622, 39, palette.heading)
-    covers = [
-        ("Soft Taupe", palette.taupe),
-        ("Blush Ritual", palette.blush),
-        ("Sage Reset", palette.sage),
-        ("Ivory Minimal", palette.paper),
-    ]
-    for index, (name, color) in enumerate(covers):
-        x = 102 + index * 210
-        y = 175 + (index % 2) * 54
-        _draw_cover(canvas, x, y, 154, 248, palette, name, color)
-    canvas.text("Aesthetic covers made to feel personal, polished, and giftable.", 104, 120, 12, palette.body, font="sans")
+def _transformation(canvas: PdfCanvas, context: _CampaignContext, system: AtelierAureliaSystem) -> None:
+    p = system.palette
+    _photo_campaign_background(canvas, system, p.blush)
+    _tracking_headline(canvas, "PLAN WITH INTENTION", 246, 696, 27, p.umber)
+    canvas.text("Create structure without pressure", 346, 660, 17, p.umber, font="serif")
+    _device(canvas, system, 300, 170, 406, 452, "weekly", "Weekly Reset")
+    _fan_pages(canvas, system, 74, 126, ["Morning Ritual", "Energy Tracker", "Goals"], 1.05)
+    _fan_pages(canvas, system, 692, 128, ["Reflect", "Habits", "Self Care"], 0.92)
+    _micro_story(canvas, system, 78, 522, "Before", "mental tabs, scattered lists")
+    _micro_story(canvas, system, 700, 522, "After", "calm rhythm, visible priorities")
+    _callout(canvas, system, "romanticize mornings", 110, 438, 330, 456)
+    _callout(canvas, system, "build habits gently", 730, 430, 686, 446)
+    _brand(canvas, system, 438, 66)
 
 
-def _draw_whats_included_slide(canvas: PdfCanvas, context: _CampaignContext, theme: Theme) -> None:
-    palette = _palette(theme)
-    _draw_luxury_background(canvas, palette)
-    canvas.text("WHAT'S INCLUDED", 95, 690, 11, palette.muted, font="sans")
-    _headline(canvas, ["A full planning", "library in one download"], 94, 622, 39, palette.heading)
-    items = _included_items(context)
-    for index, item in enumerate(items[:12]):
-        col = index % 3
-        row = index // 3
-        x = 96 + col * 286
-        y = 460 - row * 76
-        canvas.rect(x, y, 235, 46, fill=palette.paper, stroke=palette.divider, stroke_width=0.25)
-        canvas.text(f"{index + 1:02d}", x + 16, y + 18, 9, palette.muted, font="sans")
-        canvas.text(_short(item, 24), x + 48, y + 18, 10.5, palette.heading, font="sans")
-    _callout_row(canvas, 96, 112, [f"{len(context.pages)} total pages", "2 print sizes", "Instant download"], palette)
+def _covers(canvas: PdfCanvas, context: _CampaignContext, system: AtelierAureliaSystem) -> None:
+    p = system.palette
+    _photo_campaign_background(canvas, system, p.sand)
+    canvas.text("Cover options", 394, 694, 31, p.umber, font="serif")
+    canvas.text("Choose the soft neutral look that feels like your next era.", 300, 660, 13, p.umber, font="serif")
+    covers = [("Ivory", p.paper), ("Blush", p.blush), ("Sage", p.sage), ("Oat", p.oat)]
+    for index, (name, fill) in enumerate(covers):
+        _cover(canvas, system, 96 + index * 212, 164 + (28 if index % 2 else 0), 168, 328, name, fill)
+    _marketing_page(canvas, system, 744, 90, 118, 158, "Bonus cover", dense=False, accent=2)
+    _sales_badge(canvas, system, 306, 72, "soft neutral collection")
+    _brand(canvas, system, 438, 42)
 
 
-def _draw_compatibility_slide(canvas: PdfCanvas, context: _CampaignContext, theme: Theme) -> None:
-    palette = _palette(theme)
-    _draw_luxury_background(canvas, palette)
-    canvas.text("COMPATIBILITY", 95, 690, 11, palette.muted, font="sans")
-    _headline(canvas, ["Print it beautifully", "or plan on your iPad"], 94, 622, 39, palette.heading)
-    _draw_ipad_mockup(canvas, 96, 162, 302, 424, palette, "Digital", "planning")
-    _draw_print_stack(canvas, 536, 170, palette)
-    rows = [
-        ("US Letter PDF", "easy home printing"),
-        ("A4 PDF", "international print size"),
-        ("GoodNotes / Notability", "import as a PDF"),
-        ("No shipping", "digital download only"),
-    ]
-    for index, (left, right) in enumerate(rows):
-        y = 495 - index * 72
-        canvas.line(585, y, 887, y, palette.divider, 0.28)
-        canvas.text(left, 595, y + 24, 15, palette.heading, font="serif")
-        canvas.text(right, 760, y + 24, 9.5, palette.body, font="sans")
+def _included(canvas: PdfCanvas, context: _CampaignContext, system: AtelierAureliaSystem) -> None:
+    p = system.palette
+    _photo_campaign_background(canvas, system, p.oat)
+    _tracking_headline(canvas, "WHAT'S INCLUDED", 292, 694, 27, p.umber)
+    canvas.text("A complete planning library for calm routines and intentional days.", 278, 658, 12, p.umber, font="serif")
+    _device(canvas, system, 70, 154, 318, 430, "index", "Index")
+    for index, title in enumerate(_page_mix(context.page_titles)[:10]):
+        row = index // 5
+        col = index % 5
+        _mini_tile(canvas, system, 430 + col * 92, 448 - row * 116, title)
+    items = ["Complete US Letter PDF", "Complete A4 PDF", "Individual page PDFs", "Customer ZIP download", "Reusable personal-use pages", "Instant Etsy delivery"]
+    for index, item in enumerate(items):
+        canvas.text(f"{index + 1:02d}", 456, 198 - index * 24, 7, p.mist, font="sans")
+        canvas.text(item, 488, 196 - index * 24, 10, p.ink, font="serif")
+    _stat(canvas, system, 760, 108, str(context.page_count or 48), "planner pages")
 
 
-def _draw_identity_story_slide(canvas: PdfCanvas, context: _CampaignContext, theme: Theme) -> None:
-    palette = _palette(theme)
-    _draw_luxury_background(canvas, palette)
-    canvas.text("SOFT LIFE PLANNING", 95, 690, 11, palette.muted, font="sans")
-    _headline(canvas, ["Build calm habits", "and intentional routines"], 94, 620, 39, palette.heading)
-    lines = [
-        "For mornings that start gently.",
-        "For weeks with fewer open loops.",
-        "For routines that feel like self-respect.",
-        "For a life that looks like you meant it.",
-    ]
-    for index, line in enumerate(lines):
-        canvas.text(line, 112, 475 - index * 52, 17, palette.heading, font="serif")
-    _draw_editorial_portrait_placeholder(canvas, 610, 125, palette)
-    canvas.text(_short(context.audience, 66), 112, 142, 11, palette.body, font="sans")
+def _compatibility(canvas: PdfCanvas, context: _CampaignContext, system: AtelierAureliaSystem) -> None:
+    p = system.palette
+    _photo_campaign_background(canvas, system, p.sage)
+    canvas.text("Use it beautifully", 340, 694, 31, p.umber, font="serif")
+    canvas.text("Digital planning plus printable desk rituals.", 332, 660, 14, p.umber, font="serif")
+    _device(canvas, system, 92, 154, 360, 448, "weekly", "Digital")
+    _print_stack(canvas, system, 500, 162)
+    notes = [("iPad PDF", "GoodNotes / Notability"), ("Print sizes", "US Letter + A4"), ("Delivery", "Instant Etsy download"), ("Files", "PDF planner bundle")]
+    for index, (title, body) in enumerate(notes):
+        _feature_card(canvas, system, 720, 500 - index * 86, title, body)
+    _brand(canvas, system, 438, 66)
 
 
-@dataclass(frozen=True)
-class _Palette:
-    background: str
-    panel: str
-    paper: str
-    blush: str
-    taupe: str
-    sage: str
-    shadow: str
-    heading: str
-    body: str
-    muted: str
-    divider: str
+def _photo_campaign_background(canvas: PdfCanvas, system: AtelierAureliaSystem, accent: str) -> None:
+    p = system.palette
+    canvas.rect(0, 0, PDF_WIDTH, PDF_HEIGHT, fill="#CFC3B7")
+    canvas.rect(50, 50, 900, 700, fill=p.oat)
+    canvas.rect(50, 50, 900, 700, stroke="#BBAEA1", stroke_width=0.2)
+    canvas.rect(50, 610, 900, 140, fill="#EDE4DA")
+    canvas.rect(50, 50, 900, 122, fill="#C7B8A8")
+    canvas.rect(712, 50, 238, 700, fill=accent)
+    canvas.rect(164, 50, 548, 700, fill="#F0E8DE")
+    canvas.rect(50, 50, 92, 700, fill="#D9CEC3")
+    canvas.rect(858, 50, 92, 700, fill="#BFAF9E")
+    canvas.rect(292, 50, 64, 700, fill="#F7EFE6")
+    canvas.rect(604, 50, 52, 700, fill="#E5D9CE")
+    canvas.rect(50, 50, 900, 700, stroke="#F4EDE4", stroke_width=0.32)
 
 
-def _palette(theme: Theme) -> _Palette:
-    return _Palette(
-        background=theme.color("listing_background", "#EFE7DA"),
-        panel=theme.color("listing_panel", "#F9F4EC"),
-        paper=theme.color("paper_fill", "#FFFFFF"),
-        blush=theme.color("blush", "#E9D1C8"),
-        taupe=theme.color("taupe", "#CDBEAC"),
-        sage=theme.color("sage", "#D8E0D1"),
-        shadow=theme.color("paper_shadow", "#C8BBAA"),
-        heading=theme.color("heading", "#3F3934"),
-        body=theme.color("body", "#61564E"),
-        muted=theme.color("muted", "#8C7F73"),
-        divider=theme.color("divider", "#CEC2B4"),
-    )
+def _tracking_headline(canvas: PdfCanvas, value: str, x: float, y: float, size: float, color: str) -> None:
+    canvas.text(" ".join(value.upper()), x, y, size, color, font="sans")
 
 
-def _draw_luxury_background(canvas: PdfCanvas, palette: _Palette) -> None:
-    canvas.rect(0, 0, PDF_WIDTH, PDF_HEIGHT, fill=palette.background)
-    bands = [
-        (0, 610, PDF_WIDTH, 190, palette.panel),
-        (0, 0, PDF_WIDTH, 170, "#E8D8CC"),
-        (705, 0, 295, PDF_HEIGHT, "#DED6CA"),
-        (0, 0, 130, PDF_HEIGHT, "#F3EAE0"),
-    ]
-    for x, y, width, height, fill in bands:
-        canvas.rect(x, y, width, height, fill=fill)
-    canvas.rect(54, 54, PDF_WIDTH - 108, PDF_HEIGHT - 108, stroke=palette.divider, stroke_width=0.28)
-    canvas.rect(76, 76, PDF_WIDTH - 152, PDF_HEIGHT - 152, stroke="#E9DDD0", stroke_width=0.18)
+def _device(canvas: PdfCanvas, system: AtelierAureliaSystem, x: float, y: float, width: float, height: float, mode: str, title: str) -> None:
+    p = system.palette
+    canvas.rect(x + 18, y - 18, width, height, fill="#8E837A")
+    canvas.rect(x + 10, y - 10, width, height, fill="#B8ADA2")
+    canvas.rect(x, y, width, height, fill="#24211F")
+    canvas.rect(x + 14, y + 14, width - 28, height - 28, fill=p.paper)
+    canvas.rect(x + width / 2 - 18, y + height - 16, 36, 3, fill="#111111")
+    if mode == "cover":
+        _cover_art(canvas, system, x + 34, y + 38, width - 68, height - 88, title)
+    elif mode == "index":
+        _index_page(canvas, system, x + 32, y + 38, width - 64, height - 86)
+    elif mode == "weekly":
+        _weekly_page(canvas, system, x + 32, y + 38, width - 64, height - 86)
+    else:
+        _daily_page(canvas, system, x + 32, y + 38, width - 64, height - 86)
+    _tabs(canvas, system, x + width - 18, y + 58, height - 128)
 
 
-def _headline(canvas: PdfCanvas, lines: Sequence[str], x: float, y: float, size: float, color: str) -> None:
-    for index, line in enumerate(lines):
-        canvas.text(line, x, y - index * (size + 7), size, color, font="serif")
+def _cover_art(canvas: PdfCanvas, system: AtelierAureliaSystem, x: float, y: float, width: float, height: float, title: str) -> None:
+    p = system.palette
+    canvas.rect(x, y, width, height, fill="#FBF6EF", stroke=p.line, stroke_width=0.18)
+    canvas.rect(x + 10, y + 10, width - 20, height - 20, stroke="#EFE3D7", stroke_width=0.16)
+    canvas.text("2026", x + width / 2 - 18, y + height - 72, 13, p.taupe, font="serif")
+    canvas.text("SOFT LIFE", x + width / 2 - 68, y + height - 120, 24, p.umber, font="sans")
+    canvas.text("planner", x + width / 2 - 28, y + height - 148, 15, p.taupe, font="serif")
+    for index, (rx, ry, rw, rh, fill) in enumerate(
+        [
+            (24, height - 118, 46, 32, p.oat),
+            (width - 78, height - 110, 42, 58, p.blush),
+            (46, 76, 54, 84, p.sage),
+            (width - 94, 86, 58, 78, p.oat),
+            (width / 2 - 28, 46, 56, 36, p.blush),
+        ]
+    ):
+        canvas.rect(x + rx, y + ry, rw, rh, fill=fill)
+        canvas.rect(x + rx + 8, y + ry + 8, rw - 16, rh - 16, stroke=p.paper, stroke_width=0.2)
+    canvas.text("wellness  routines  reflection", x + width / 2 - 68, y + 28, 5.4, p.umber, font="sans")
 
 
-def _split_headline(value: str) -> List[str]:
-    words = value.split()
-    if len(words) <= 3:
-        return [value]
-    midpoint = max(2, len(words) // 2)
-    return [" ".join(words[:midpoint]), " ".join(words[midpoint:])]
+def _daily_page(canvas: PdfCanvas, system: AtelierAureliaSystem, x: float, y: float, width: float, height: float) -> None:
+    p = system.palette
+    canvas.text("THURSDAY, JANUARY 1", x + 18, y + height - 28, 9.5, p.ink, font="serif")
+    canvas.rect(x + width * 0.50, y + height - 62, width * 0.40, 24, fill=p.blush)
+    canvas.text("today I am creating calm", x + width * 0.53, y + height - 52, 5.4, p.umber, font="serif")
+    _section(canvas, system, x + 18, y + height - 78, width * 0.44, 118, "Schedule", 7)
+    _section(canvas, system, x + width * 0.52, y + height - 78, width * 0.38, 118, "Priorities", 5)
+    _section(canvas, system, x + 18, y + height - 224, width * 0.44, 110, "Self-care", 5)
+    _section(canvas, system, x + width * 0.52, y + height - 224, width * 0.38, 110, "To do", 6)
+    _section(canvas, system, x + 18, y + 36, width * 0.82, 96, "Notes + inspiration", 4)
+    canvas.rect(x + width * 0.64, y + 72, 48, 32, fill=p.oat)
+    canvas.text("soft reset", x + width * 0.66, y + 84, 4.8, p.umber, font="serif")
 
 
-def _callout_row(canvas: PdfCanvas, x: float, y: float, labels: Sequence[str], palette: _Palette) -> None:
-    cursor = x
-    for label in labels:
-        width = max(112, len(label) * 5.8 + 34)
-        canvas.rect(cursor, y, width, 30, fill=palette.paper, stroke=palette.divider, stroke_width=0.22)
-        canvas.text(label, cursor + 17, y + 11, 9, palette.heading, font="sans")
-        cursor += width + 12
+def _weekly_page(canvas: PdfCanvas, system: AtelierAureliaSystem, x: float, y: float, width: float, height: float) -> None:
+    p = system.palette
+    canvas.text("WEEK 6  |  FEBRUARY 2 - 8", x + 18, y + height - 28, 9.5, p.ink, font="serif")
+    grid_x = x + 18
+    grid_y = y + 162
+    cell_w = (width - 36) / 4
+    cell_h = (height - 210) / 2
+    for row in range(2):
+        for col in range(4):
+            cx = grid_x + col * cell_w
+            cy = grid_y + row * cell_h
+            canvas.rect(cx, cy, cell_w - 4, cell_h - 5, stroke=p.line, fill=p.paper, stroke_width=0.15)
+            canvas.text(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun", "Notes"][row * 4 + col].upper(), cx + 6, cy + cell_h - 20, 6, p.umber, font="sans")
+            for line in range(4):
+                canvas.line(cx + 8, cy + cell_h - 38 - line * 15, cx + cell_w - 14, cy + cell_h - 38 - line * 15, p.line, 0.13)
+            if (row + col) % 3 == 0:
+                canvas.rect(cx + 12, cy + 18, cell_w - 28, 12, fill=p.blush if row == 0 else p.oat)
+    _section(canvas, system, x + 18, y + 36, width - 36, 90, "Weekly focus", 4)
 
 
-def _draw_ipad_mockup(canvas: PdfCanvas, x: float, y: float, width: float, height: float, palette: _Palette, title: str, subtitle: str) -> None:
-    canvas.rect(x + 13, y - 13, width, height, fill=palette.shadow)
-    canvas.rect(x, y, width, height, fill="#4B4540")
-    canvas.rect(x + 16, y + 16, width - 32, height - 32, fill=palette.paper)
-    canvas.rect(x + 34, y + height - 82, width - 68, 34, fill=palette.blush)
-    canvas.text(title, x + 44, y + height - 68, 22, palette.heading, font="serif")
-    canvas.text(subtitle, x + 46, y + height - 96, 9, palette.body, font="sans")
-    for index in range(5):
-        yy = y + height - 142 - index * 42
-        canvas.rect(x + 42, yy, width - 84, 17, fill="#F4EEE8", stroke=palette.divider, stroke_width=0.12)
-    canvas.rect(x + 42, y + 48, (width - 100) / 2, 84, fill=palette.sage)
-    canvas.rect(x + 58 + (width - 100) / 2, y + 48, (width - 100) / 2, 84, fill=palette.taupe)
+def _index_page(canvas: PdfCanvas, system: AtelierAureliaSystem, x: float, y: float, width: float, height: float) -> None:
+    p = system.palette
+    canvas.text("INDEX", x + width / 2 - 28, y + height - 48, 20, p.umber, font="sans")
+    columns = ["Year", "Becoming", "Wellness", "Finance"]
+    for col, heading in enumerate(columns):
+        cx = x + 18 + col * (width - 36) / 4
+        canvas.text(heading.upper(), cx, y + height - 90, 6.3, p.umber, font="sans")
+        canvas.line(cx, y + height - 100, cx + (width - 56) / 4, y + height - 100, p.umber, 0.16)
+        for row in range(10):
+            canvas.text(_short(["calendar", "goals", "habits", "reflection", "tracker", "journal"][row % 6], 12), cx, y + height - 122 - row * 18, 4.8, p.smoke, font="sans")
 
 
-def _draw_layered_spreads(canvas: PdfCanvas, x: float, y: float, palette: _Palette, labels: Sequence[str], scale: float = 1.0) -> None:
+def _section(canvas: PdfCanvas, system: AtelierAureliaSystem, x: float, y_top: float, width: float, height: float, title: str, rows: int) -> None:
+    p = system.palette
+    y = y_top - height
+    canvas.rect(x, y, width, height, stroke=p.line, fill=p.paper, stroke_width=0.14)
+    canvas.text(title.upper(), x + 6, y + height - 13, 5.8, p.umber, font="sans")
+    for row in range(rows):
+        yy = y + height - 28 - row * ((height - 38) / max(rows, 1))
+        canvas.line(x + 6, yy, x + width - 6, yy, p.line, 0.12)
+        if row % 2 == 0 and width > 90:
+            canvas.rect(x + 8, yy + 4, 4, 4, stroke=p.taupe, stroke_width=0.1)
+
+
+def _tabs(canvas: PdfCanvas, system: AtelierAureliaSystem, x: float, y: float, height: float) -> None:
+    p = system.palette
+    labels = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG"]
+    tab_h = height / len(labels)
     for index, label in enumerate(labels):
-        px = x + index * 70 * scale
-        py = y + index * 34 * scale
-        width = 158 * scale
-        height = 226 * scale
-        canvas.rect(px + 8, py - 8, width, height, fill=palette.shadow)
-        canvas.rect(px, py, width, height, fill=palette.paper, stroke=palette.divider, stroke_width=0.22)
-        canvas.rect(px + 18 * scale, py + height - 58 * scale, width - 36 * scale, 24 * scale, fill=[palette.blush, palette.sage, palette.taupe][index % 3])
-        canvas.text(label, px + 22 * scale, py + height - 49 * scale, 9 * scale, palette.heading, font="serif")
-        for row in range(5):
-            yy = py + 44 * scale + row * 24 * scale
-            canvas.line(px + 20 * scale, yy, px + width - 22 * scale, yy, palette.divider, 0.18)
+        yy = y + height - (index + 1) * tab_h
+        canvas.rect(x, yy, 16, tab_h - 2, fill=p.blush if index % 2 else p.oat, stroke=p.line, stroke_width=0.1)
+        canvas.text(label, x + 4, yy + tab_h / 2 - 2, 3.8, p.umber, font="sans")
 
 
-def _feature_cards(canvas: PdfCanvas, x: float, y: float, features: Sequence[tuple[str, str]], palette: _Palette) -> None:
-    for index, (title, body) in enumerate(features):
-        col = index % 2
-        row = index // 2
-        cx = x + col * 260
-        cy = y - row * 122
-        canvas.rect(cx, cy, 230, 82, fill=palette.paper, stroke=palette.divider, stroke_width=0.24)
-        canvas.rect(cx, cy, 12, 82, fill=[palette.blush, palette.sage, palette.taupe, palette.panel][index])
-        canvas.text(title, cx + 28, cy + 50, 14, palette.heading, font="serif")
-        canvas.text(_short(body, 44), cx + 28, cy + 26, 8.5, palette.body, font="sans")
+def _callout(canvas: PdfCanvas, system: AtelierAureliaSystem, text: str, tx: float, ty: float, lx: float, ly: float) -> None:
+    p = system.palette
+    lines = text.split("|")
+    canvas.text(lines[0], tx, ty, 10.5, p.umber, font="serif")
+    if len(lines) > 1:
+        canvas.text(lines[1], tx, ty - 17, 8.2, p.smoke, font="sans")
+    canvas.line(tx + (145 if tx < lx else -12), ty - 6, lx, ly, p.umber, 0.18)
+    canvas.rect(lx - 2, ly - 2, 4, 4, fill=p.umber)
 
 
-def _draw_magazine_stack(canvas: PdfCanvas, x: float, y: float, palette: _Palette, titles: Sequence[str]) -> None:
-    _draw_layered_spreads(canvas, x, y, palette, [_short(title, 18) for title in titles[:3]] or ["Planner", "Routine", "Journal"], scale=1.15)
-    canvas.rect(x - 46, y + 420, 280, 44, fill=palette.paper, stroke=palette.divider, stroke_width=0.18)
-    canvas.text("MAGAZINE-STYLE PLANNER SPREADS", x - 24, y + 437, 9, palette.muted, font="sans")
+def _pill(canvas: PdfCanvas, system: AtelierAureliaSystem, x: float, y: float, text: str) -> None:
+    p = system.palette
+    w = max(128, len(text) * 5.6 + 28)
+    canvas.rect(x, y, w, 28, fill=p.paper, stroke=p.line, stroke_width=0.18)
+    canvas.text(text.upper(), x + 14, y + 10, 7.2, p.umber, font="sans")
 
 
-def _draw_editorial_list(canvas: PdfCanvas, x: float, y: float, titles: Sequence[str], palette: _Palette) -> None:
-    for index, title in enumerate(titles):
-        canvas.line(x, y - index * 42, x + 338, y - index * 42, palette.divider, 0.2)
-        canvas.text(f"0{index + 1}", x + 4, y - index * 42 + 14, 8, palette.muted, font="sans")
-        canvas.text(_short(title, 34), x + 46, y - index * 42 + 13, 12, palette.heading, font="serif")
+def _sales_badge(canvas: PdfCanvas, system: AtelierAureliaSystem, x: float, y: float, text: str) -> None:
+    p = system.palette
+    w = max(116, len(text) * 5.8 + 28)
+    canvas.rect(x + 5, y - 5, w, 34, fill="#B3A699")
+    canvas.rect(x, y, w, 34, fill="#FBF6EF", stroke=p.line, stroke_width=0.18)
+    canvas.text(text.upper(), x + 14, y + 13, 7.8, p.umber, font="sans")
 
 
-def _draw_mini_scene(canvas: PdfCanvas, x: float, y: float, palette: _Palette) -> None:
-    canvas.rect(x, y, 310, 84, fill=palette.panel, stroke=palette.divider, stroke_width=0.18)
-    canvas.rect(x + 20, y + 18, 58, 46, fill=palette.blush)
-    canvas.rect(x + 94, y + 18, 92, 46, fill=palette.paper)
-    canvas.rect(x + 202, y + 18, 72, 46, fill=palette.sage)
+def _fan_pages(canvas: PdfCanvas, system: AtelierAureliaSystem, x: float, y: float, labels: Sequence[str], scale: float) -> None:
+    for index, label in enumerate(labels):
+        _marketing_page(canvas, system, x + index * 56 * scale, y + index * 34 * scale, 138 * scale, 204 * scale, label, dense=True, accent=index)
 
 
-def _draw_cover(canvas: PdfCanvas, x: float, y: float, width: float, height: float, palette: _Palette, name: str, color: str) -> None:
-    canvas.rect(x + 8, y - 8, width, height, fill=palette.shadow)
-    canvas.rect(x, y, width, height, fill=color, stroke=palette.divider, stroke_width=0.28)
-    canvas.rect(x + 18, y + 18, width - 36, height - 36, stroke=palette.paper, stroke_width=0.35)
-    canvas.text("Soft Life", x + 28, y + height - 74, 18, palette.heading, font="serif")
-    canvas.text("Planner", x + 30, y + height - 102, 13, palette.heading, font="serif")
-    canvas.text(name.upper(), x + 30, y + 38, 7.5, palette.body, font="sans")
+def _marketing_page(canvas: PdfCanvas, system: AtelierAureliaSystem, x: float, y: float, width: float, height: float, title: str, dense: bool, accent: int) -> None:
+    p = system.palette
+    accent_colors = [p.blush, p.sage, p.oat]
+    canvas.rect(x + 7, y - 7, width, height, fill="#AFA397")
+    canvas.rect(x, y, width, height, fill=p.paper, stroke=p.line, stroke_width=0.16)
+    canvas.rect(x + 16, y + height - 42, width - 32, 22, fill=accent_colors[accent % 3])
+    canvas.text(_short(title, 16), x + 20, y + height - 35, 9.5, p.ink, font="serif")
+    rows = 9 if dense else 5
+    for row in range(rows):
+        yy = y + height - 64 - row * ((height - 90) / rows)
+        canvas.line(x + 18, yy, x + width - 18, yy, p.line, 0.12)
+        if row % 3 == 0:
+            canvas.rect(x + 20, yy + 5, 5, 5, stroke=p.taupe, stroke_width=0.1)
+        if dense and row % 4 == 1:
+            canvas.rect(x + width - 54, yy + 3, 28, 10, fill=accent_colors[(accent + row) % 3])
 
 
-def _draw_print_stack(canvas: PdfCanvas, x: float, y: float, palette: _Palette) -> None:
+def _micro_story(canvas: PdfCanvas, system: AtelierAureliaSystem, x: float, y: float, label: str, text: str) -> None:
+    p = system.palette
+    canvas.rect(x, y, 208, 72, fill=p.paper, stroke=p.line, stroke_width=0.16)
+    canvas.text(label.upper(), x + 18, y + 45, 7, p.umber, font="sans")
+    canvas.text(text, x + 18, y + 22, 11, p.ink, font="serif")
+
+
+def _cover(canvas: PdfCanvas, system: AtelierAureliaSystem, x: float, y: float, width: float, height: float, label: str, fill: str) -> None:
+    p = system.palette
+    canvas.rect(x + 8, y - 8, width, height, fill="#AFA397")
+    canvas.rect(x, y, width, height, fill=fill, stroke=p.line, stroke_width=0.16)
+    canvas.rect(x + 16, y + 16, width - 32, height - 32, stroke=p.paper, stroke_width=0.22)
+    canvas.text("2026", x + width / 2 - 15, y + height - 72, 12, p.taupe, font="serif")
+    canvas.text("Soft Life", x + 30, y + height - 112, 20, p.ink, font="serif")
+    canvas.text("Planner", x + 32, y + height - 138, 13, p.ink, font="serif")
+    canvas.text(label.upper(), x + 30, y + 38, 6.5, p.umber, font="sans")
+    canvas.rect(x + width - 54, y + 56, 28, 48, fill=p.paper)
+    canvas.rect(x + 32, y + 78, 54, 78, fill=p.paper)
+    canvas.rect(x + 42, y + 92, 34, 50, stroke=p.line, stroke_width=0.14)
+
+
+def _mini_tile(canvas: PdfCanvas, system: AtelierAureliaSystem, x: float, y: float, title: str) -> None:
+    _marketing_page(canvas, system, x, y, 78, 102, title, dense=True, accent=len(title))
+
+
+def _feature_card(canvas: PdfCanvas, system: AtelierAureliaSystem, x: float, y: float, title: str, body: str) -> None:
+    p = system.palette
+    canvas.rect(x, y, 202, 58, fill=p.paper, stroke=p.line, stroke_width=0.16)
+    canvas.text(title.upper(), x + 14, y + 35, 6.5, p.umber, font="sans")
+    canvas.text(body, x + 14, y + 17, 10, p.ink, font="serif")
+
+
+def _stat(canvas: PdfCanvas, system: AtelierAureliaSystem, x: float, y: float, value: str, label: str) -> None:
+    p = system.palette
+    canvas.text(value, x, y + 54, 48, p.ink, font="serif")
+    canvas.text(label.upper(), x + 2, y + 28, 7, p.umber, font="sans")
+
+
+def _print_stack(canvas: PdfCanvas, system: AtelierAureliaSystem, x: float, y: float) -> None:
     for index, label in enumerate(["US Letter", "A4", "Individual Pages"]):
-        px = x + index * 38
-        py = y + index * 24
-        canvas.rect(px + 8, py - 8, 148, 210, fill=palette.shadow)
-        canvas.rect(px, py, 148, 210, fill=palette.paper, stroke=palette.divider, stroke_width=0.2)
-        canvas.text(label, px + 20, py + 168, 11, palette.heading, font="serif")
-        for row in range(5):
-            canvas.line(px + 20, py + 52 + row * 20, px + 128, py + 52 + row * 20, palette.divider, 0.15)
+        _marketing_page(canvas, system, x + index * 58, y + index * 38, 150, 216, label, dense=True, accent=index)
 
 
-def _draw_editorial_portrait_placeholder(canvas: PdfCanvas, x: float, y: float, palette: _Palette) -> None:
-    canvas.rect(x, y, 260, 470, fill=palette.taupe, stroke=palette.divider, stroke_width=0.24)
-    canvas.rect(x + 22, y + 24, 216, 422, fill=palette.panel)
-    canvas.rect(x + 54, y + 230, 152, 130, fill=palette.blush)
-    canvas.rect(x + 72, y + 112, 116, 92, fill=palette.sage)
-    canvas.text("the calm routine era", x + 46, y + 62, 16, palette.heading, font="serif")
+def _brand(canvas: PdfCanvas, system: AtelierAureliaSystem, x: float, y: float) -> None:
+    canvas.text("atelier aurelia", x, y, 13, system.palette.umber, font="serif")
 
 
-def _category_titles(titles: Sequence[str], keywords: Sequence[str], offset: int) -> List[str]:
-    matches = [title for title in titles if any(keyword in title.lower() for keyword in keywords)]
-    if len(matches) >= 6:
-        return matches[:6]
-    fallback = list(titles[offset * 3 : offset * 3 + 8]) + list(titles[:8])
-    for title in fallback:
-        if title not in matches:
-            matches.append(title)
-        if len(matches) >= 6:
-            break
-    return matches
+def _page_mix(titles: Sequence[str]) -> List[str]:
+    fallback = ["Weekly Reset", "Morning Ritual", "Mood Tracker", "Evening Reflection", "Habit System", "Self-Care Menu", "Notes"]
+    return (list(titles) + fallback)[:10]
 
 
-def _included_items(context: _CampaignContext) -> List[str]:
-    categories = [
-        "Complete planner PDFs",
-        "US Letter format",
-        "A4 format",
-        "Individual page files",
-        "Routine pages",
-        "Wellness trackers",
-        "Reflection prompts",
-        "Journaling pages",
-        "Habit tracking",
-        "Meal and movement",
-        "Notes pages",
-        "Printable download",
-    ]
-    titles = context.page_titles
-    for index, title in enumerate(titles[: min(4, len(titles))]):
-        categories[4 + index] = title
-    return categories
+def _clean_name(value: str, fallback: str) -> str:
+    source = fallback if "," in value or " pdf" in value.lower() or " instant download" in value.lower() else value
+    blocked = {"printable", "download", "instant", "pdf"}
+    words = [word for word in source.replace(",", " ").split() if word.lower() not in blocked]
+    return " ".join(words).strip() or fallback
 
 
-def _clean_campaign_name(value: str) -> str:
-    remove = [
-        " printable",
-        " planner pdf",
-        " pdf",
-        " instant download",
-        " digital download",
-        " daily weekly",
-        " habit tracker",
-        " self care planner",
-    ]
-    cleaned = value
-    for phrase in remove:
-        cleaned = cleaned.replace(phrase.title(), "").replace(phrase.upper(), "").replace(phrase, "")
-    cleaned = cleaned.replace(",", " ")
-    words = [word for word in cleaned.split() if word.lower() not in {"printable", "download", "instant"}]
-    cleaned = " ".join(words).strip()
-    if not cleaned:
-        return "Soft Life Planner"
-    if "planner" not in cleaned.lower():
-        cleaned = f"{cleaned} Planner"
-    return cleaned
+def _unique(values: Iterable[str]) -> List[str]:
+    seen = set()
+    result: List[str] = []
+    for value in values:
+        normalized = " ".join(str(value).strip().split())
+        key = normalized.lower()
+        if normalized and key not in seen:
+            result.append(normalized)
+            seen.add(key)
+    return result
 
 
 def _short(value: str, limit: int) -> str:
     return value if len(value) <= limit else value[: limit - 3].rstrip() + "..."
 
 
-def _write_fallback_png(path: Path, theme: Theme) -> None:
-    canvas = PngCanvas(LISTING_WIDTH, LISTING_HEIGHT, _rgb(theme, "listing_background", "#EFE7DA"))
-    canvas.rect(80, 80, LISTING_WIDTH - 160, LISTING_HEIGHT - 160, _rgb(theme, "listing_panel", "#F9F4EC"))
-    canvas.rect(600, 260, 620, 980, _rgb(theme, "paper_fill", "#FFFFFF"))
+def _fallback_png(path: Path, palette: Palette) -> None:
+    canvas = PngCanvas(LISTING_WIDTH, LISTING_HEIGHT, _rgb(palette.oat))
+    canvas.rect(120, 120, LISTING_WIDTH - 240, LISTING_HEIGHT - 240, _rgb(palette.paper))
     canvas.write(path)
 
 
-def _rgb(theme: Theme, key: str, fallback: str) -> RGB:
-    return hex_to_rgb(theme.color(key, fallback))
+def _rgb(color: str) -> RGB:
+    return hex_to_rgb(color)
