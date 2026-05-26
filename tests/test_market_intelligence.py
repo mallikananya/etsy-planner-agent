@@ -106,12 +106,14 @@ def test_market_signals_file_drives_listing_metadata_and_listing_upgrade_path(tm
     assert manifest["pricing_strategy"]["etsy_autofill"]["price"] == metadata["recommended_price"]
     assert "customer_objection_coverage" in metadata
     assert len(manifest["listing_upgrade_path"]["staged_upgrades"]) == 4
-    assert "Quick answers before you buy" in metadata["description"]
+    assert "Important Notes" in metadata["description"]
     assert "not an editable Canva" in metadata["description"]
     assert "work week" in metadata["description"].lower()
+    assert metadata["description_copy_engine"]["brand_voice"] == "polished_work_reset"
     assert manifest["market_brief"]["visual_keywords"][:3] == ["desk setup", "laptop", "coffee"]
     assert "weekly_reset" in manifest["product_concept"]["selected_page_ids"]
-    assert (result.output_dir / "exports/png/listing-images/01_hero.png").read_bytes().startswith(b"\x89PNG\r\n\x1a\n")
+    assert (result.output_dir / "exports/png/listing-images/01_hero_thumbnail.png").read_bytes().startswith(b"\x89PNG\r\n\x1a\n")
+    assert manifest["listing_image_files"][0] == "exports/png/listing-images/01_hero_thumbnail.png"
 
 
 def test_dynamic_page_selection_adapts_pages_to_market_concept():

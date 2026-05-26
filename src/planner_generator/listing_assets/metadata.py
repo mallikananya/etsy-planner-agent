@@ -3,7 +3,8 @@ from __future__ import annotations
 from typing import Dict, List
 
 from planner_generator.listing_assets.constraints import ETSY_DESCRIPTION_MAX_LENGTH, ETSY_TITLE_MAX_LENGTH, truncate_text
-from planner_generator.listing_assets.customer_objections import build_customer_objection_coverage, objection_description_lines
+from planner_generator.listing_assets.customer_objections import build_customer_objection_coverage
+from planner_generator.listing_assets.description_copy import generate_listing_description
 from planner_generator.market_intelligence.models import DifferentiationBrief, ListingUpgradePath, NicheBrief, PricingStrategy, ProductConcept
 from planner_generator.planner_specs.models import BundleSpec
 from planner_generator.seo.tags import generate_tags
@@ -22,11 +23,25 @@ def generate_listing_metadata(
     tags = generate_tags(bundle, market_brief)
     title = _listing_title(bundle, market_brief, product_concept)
     objection_coverage = build_customer_objection_coverage(bundle, product_concept)
-    description = _listing_description(bundle, theme, market_brief, product_concept, differentiation, objection_coverage)
+    description_copy = generate_listing_description(bundle, theme, market_brief, product_concept, differentiation, objection_coverage)
     included_pages = product_concept.included_page_titles if product_concept else [str(page) for page in bundle.metadata.get("included_pages", [])]
     metadata: Dict[str, object] = {
         "title": title,
-        "description": description,
+        "description": description_copy.text,
+        "description_sections": [section.to_dict() for section in description_copy.sections],
+        "description_copy_engine": {
+            "name": "etsy_luxury_sales_page",
+            "brand_voice": description_copy.brand_voice,
+            "seo_keywords_used": description_copy.seo_keywords_used,
+            "structure": [
+                "emotional_opening_hook",
+                "transformation_benefits",
+                "helps_you",
+                "key_features",
+                "what_you_receive",
+                "important_notes",
+            ],
+        },
         "tags": tags,
         "materials": ["PDF", "Printable planner", "Digital download"],
         "theme": theme.id,
@@ -80,69 +95,6 @@ def _listing_title(bundle: BundleSpec, market_brief: NicheBrief | None, product_
             title_parts.append(part)
             seen.add(key)
     return truncate_text(" | ".join(title_parts), ETSY_TITLE_MAX_LENGTH)
-
-
-def _listing_description(
-    bundle: BundleSpec,
-    theme: Theme,
-    market_brief: NicheBrief | None,
-    product_concept: ProductConcept | None,
-    differentiation: DifferentiationBrief | None,
-    objection_coverage: Dict[str, object],
-) -> str:
-    included_pages = [str(page) for page in bundle.metadata.get("included_pages", [])]
-    if product_concept and product_concept.included_page_titles:
-        included_pages = product_concept.included_page_titles[:18]
-    page_count = int(bundle.metadata.get("page_count") or len(included_pages) or 0)
-    opening = "A soft printable planner bundle for Sunday resets, gentle routines, life admin, self-care check-ins, and quiet weekly planning."
-    if market_brief and market_brief.source_signals and market_brief.source_signals[0].get("source") != "bundle_metadata":
-        opening = f"A soft printable reset planner for {market_brief.name.lower()} routines, work week planning, gentle priorities, and calm life admin."
-    details: List[str] = [
-        opening,
-        "",
-        "This set is designed to feel calm on your desk and easy to actually use: airy layouts, warm neutral styling, elegant headings, simple writing space, and prompts that feel human instead of corporate.",
-        "",
-        "What is included",
-        f"- {page_count} printable planner pages" if page_count else "- Printable planner pages",
-        "- Complete US Letter PDF",
-        "- Complete A4 PDF",
-        "- Individual page PDFs for flexible printing",
-        "- Instant digital download",
-        "",
-        "Page themes include",
-    ]
-    for page_name in included_pages[:14]:
-        details.append(f"- {page_name}")
-    details.extend(
-        [
-            "",
-            "Perfect for",
-            "- Sunday reset routines",
-            "- Soft productivity and slow living",
-            "- Weekly planning without overwhelm",
-            "- Self-care check-ins and tiny habits",
-            "- Pretty, neutral printable desk stationery",
-            "",
-            "Printing details",
-            "- Digital PDF files only; no physical item will be shipped",
-            "- Print at home or with a local print shop",
-            "- Use actual size / 100% scale for best results",
-            "- Reprint your favorite pages whenever you need a fresh start",
-            "",
-            "Quick answers before you buy",
-            "- This is a printable digital product, not a physical planner",
-            "- This is not an editable Canva template",
-            "- The files are ready to print in US Letter and A4 sizes",
-            "- You can use the pages in a note-taking app if you prefer digital handwriting",
-            "",
-            "Aesthetic",
-            "Warm ivory, soft beige, muted sage, taupe accents, charcoal text, editorial serif headings, and clean sans-serif body text.",
-            "",
-            "Please note",
-            "Colors can vary slightly by monitor and printer. This is a digital download, so you will receive files through Etsy after purchase.",
-        ]
-    )
-    return truncate_text("\n".join(details).strip(), ETSY_DESCRIPTION_MAX_LENGTH)
 
 
 def _market_positioning(bundle: BundleSpec, market_brief: NicheBrief | None, product_concept: ProductConcept | None) -> str:

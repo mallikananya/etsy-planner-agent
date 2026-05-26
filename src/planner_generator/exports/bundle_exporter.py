@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Dict, List
 
 from planner_generator.listing_assets.constraints import ETSY_DIGITAL_FILE_MAX_COUNT, ETSY_LISTING_IMAGE_MAX_COUNT
+from planner_generator.listing_assets.carousel import write_etsy_listing_carousel
 from planner_generator.listing_assets.metadata import generate_listing_metadata
 from planner_generator.bundle_builder.lifestyle_pages import build_lifestyle_pages
 from planner_generator.market_intelligence.concepts import build_product_concept
@@ -16,12 +17,10 @@ from planner_generator.market_intelligence.models import DifferentiationBrief, L
 from planner_generator.market_intelligence.page_selection import product_concept_with_pages, repeat_pages_for_bundle, select_concept_pages
 from planner_generator.market_intelligence.pricing import build_pricing_strategy
 from planner_generator.market_intelligence.signals import build_market_brief
-from planner_generator.packaging.zipper import create_customer_zip
 from planner_generator.planner_specs.loader import load_bundle_spec, load_page_spec
 from planner_generator.planner_specs.models import BundleSpec, PageSpec
 from planner_generator.planner_specs.validation import validate_page_count
-from planner_generator.rendering.page_renderer import render_page_to_pdf, render_pages_to_pdf
-from planner_generator.listing_assets.previews import write_listing_preview_assets
+from planner_generator.product_generation.pipeline import generate_planner_product_files
 from planner_generator.theme_engine.models import Theme
 
 
@@ -61,23 +60,8 @@ def export_bundle(bundle_path: str | Path, theme: Theme, output_root: str | Path
     if output_dir.exists():
         shutil.rmtree(output_dir)
 
-    generated_files: List[Path] = []
-    primary_customer_files: List[Path] = []
-    individual_page_files: List[Path] = []
-    for size_id in bundle.paper_sizes:
-        size_folder = _pdf_size_folder(size_id)
-        combined_path = output_dir / "exports" / "pdf" / size_folder / f"{bundle.id}_{size_folder}_complete.pdf"
-        render_pages_to_pdf(pages, theme, size_id, combined_path)
-        generated_files.append(combined_path)
-        primary_customer_files.append(combined_path)
-
-        size_dir = output_dir / "exports" / "pdf" / size_folder
-        for index, page in enumerate(pages, start=1):
-            file_name = f"{index:03d}_{page.id}.pdf"
-            output_path = size_dir / file_name
-            render_page_to_pdf(page, theme, size_id, output_path)
-            generated_files.append(output_path)
-            individual_page_files.append(output_path)
+    product_result = generate_planner_product_files(bundle, theme, pages, output_dir)
+    generated_files: List[Path] = list(product_result.generated_files)
 
     listing_dir = output_dir / "listing"
     listing_dir.mkdir(parents=True, exist_ok=True)
@@ -87,13 +71,26 @@ def export_bundle(bundle_path: str | Path, theme: Theme, output_root: str | Path
     (listing_dir / "tags.json").write_text(json.dumps(listing_metadata["tags"], indent=2) + "\n", encoding="utf-8")
     (listing_dir / "metadata.json").write_text(json.dumps(listing_metadata, indent=2) + "\n", encoding="utf-8")
     generated_files.extend([listing_dir / "title.txt", listing_dir / "description.txt", listing_dir / "tags.json", listing_dir / "metadata.json"])
-    preview_files = write_listing_preview_assets(output_dir, bundle, theme, pages, market_brief)
-    generated_files.extend(preview_files)
+    listing_image_files = write_etsy_listing_carousel(output_dir, bundle, theme, pages, market_brief, product_concept, differentiation, listing_upgrade_path)
+    generated_files.extend(listing_image_files)
 
-    zip_path = create_customer_zip(output_dir, primary_customer_files)
-    generated_files.append(zip_path)
-
-    manifest = _build_manifest(bundle, theme, pages, generated_files, primary_customer_files, individual_page_files, preview_files, zip_path, output_dir, market_brief, product_concept, differentiation, listing_upgrade_path, pricing_strategy)
+    manifest = _build_manifest(
+        bundle,
+        theme,
+        pages,
+        generated_files,
+        product_result.primary_customer_files,
+        product_result.individual_page_files,
+        product_result.product_preview_files,
+        listing_image_files,
+        product_result.zip_path,
+        output_dir,
+        market_brief,
+        product_concept,
+        differentiation,
+        listing_upgrade_path,
+        pricing_strategy,
+    )
     manifest_path = output_dir / "manifest.json"
     manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
     generated_files.append(manifest_path)
@@ -124,12 +121,6 @@ def _load_page_library(pages_dir: Path) -> List[PageSpec]:
     return [load_page_spec(path) for path in sorted(pages_dir.resolve().glob("*.json"))]
 
 
-def _pdf_size_folder(size_id: str) -> str:
-    if size_id.lower() == "letter":
-        return "us-letter"
-    return size_id.lower()
-
-
 def _build_manifest(
     bundle: BundleSpec,
     theme: Theme,
@@ -137,7 +128,8 @@ def _build_manifest(
     generated_files: List[Path],
     primary_customer_files: List[Path],
     individual_page_files: List[Path],
-    preview_files: List[Path],
+    product_preview_files: List[Path],
+    listing_image_files: List[Path],
     zip_path: Path,
     output_dir: Path,
     market_brief: NicheBrief,
@@ -147,7 +139,8 @@ def _build_manifest(
     pricing_strategy: PricingStrategy,
 ) -> Dict[str, object]:
     primary_customer_file_refs = [str(path.relative_to(output_dir)) for path in primary_customer_files]
-    preview_file_refs = [str(path.relative_to(output_dir)) for path in preview_files]
+    listing_image_refs = [str(path.relative_to(output_dir)) for path in listing_image_files]
+    product_preview_refs = [str(path.relative_to(output_dir)) for path in product_preview_files]
     return {
         "bundle_id": bundle.id,
         "bundle_name": bundle.name,
@@ -160,18 +153,32 @@ def _build_manifest(
         "differentiation_brief": differentiation.to_dict(),
         "listing_upgrade_path": listing_upgrade_path.to_dict(),
         "pricing_strategy": pricing_strategy.to_dict(),
+        "generation_pipelines": {
+            "product_generation": {
+                "purpose": "Generate the actual planner product for customer use.",
+                "outputs": ["printable_pdfs", "individual_page_pdfs", "customer_zip", "product_page_previews"],
+                "optimization_goal": "functionality",
+            },
+            "etsy_listing_image_generation": {
+                "purpose": "Generate marketing graphics for Etsy conversion.",
+                "outputs": ["hero_thumbnail", "features_slide", "page_category_slides", "transformation_slides", "cover_options", "included_value_slide", "compatibility_slide"],
+                "optimization_goal": "aspiration_and_conversion",
+            },
+        },
         "primary_customer_files": primary_customer_file_refs,
         "individual_page_files": [str(path.relative_to(output_dir)) for path in individual_page_files],
-        "preview_files": preview_file_refs,
+        "listing_image_files": listing_image_refs,
+        "product_preview_files": product_preview_refs,
+        "preview_files": listing_image_refs,
         "zip_file": str(zip_path.relative_to(output_dir)),
         "etsy_upload": {
             "digital_files": primary_customer_file_refs,
             "digital_file_count": len(primary_customer_file_refs),
             "digital_file_limit": ETSY_DIGITAL_FILE_MAX_COUNT,
-            "listing_images": preview_file_refs[:ETSY_LISTING_IMAGE_MAX_COUNT],
-            "listing_image_count": min(len(preview_file_refs), ETSY_LISTING_IMAGE_MAX_COUNT),
+            "listing_images": listing_image_refs[:ETSY_LISTING_IMAGE_MAX_COUNT],
+            "listing_image_count": min(len(listing_image_refs), ETSY_LISTING_IMAGE_MAX_COUNT),
             "listing_image_limit": ETSY_LISTING_IMAGE_MAX_COUNT,
-            "ready_for_draft": len(primary_customer_file_refs) <= ETSY_DIGITAL_FILE_MAX_COUNT and bool(preview_file_refs),
+            "ready_for_draft": len(primary_customer_file_refs) <= ETSY_DIGITAL_FILE_MAX_COUNT and bool(listing_image_refs),
         },
         "file_details": [_file_detail(path, output_dir) for path in generated_files],
         "files": [str(path) for path in generated_files],

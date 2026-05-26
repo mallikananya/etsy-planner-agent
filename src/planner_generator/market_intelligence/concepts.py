@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from typing import Iterable, List
 
 from planner_generator.market_intelligence.models import NicheBrief, ProductConcept
@@ -86,7 +87,17 @@ def _niche_text(niche: NicheBrief) -> str:
 
 
 def _matches(text: str, terms: List[str]) -> bool:
-    return any(term in text for term in terms)
+    normalized = re.sub(r"[^a-z0-9]+", " ", text.lower())
+    tokens = set(normalized.split())
+    for term in terms:
+        phrase = re.sub(r"[^a-z0-9]+", " ", term.lower()).strip()
+        if not phrase:
+            continue
+        if " " in phrase and phrase in normalized:
+            return True
+        if phrase in tokens:
+            return True
+    return False
 
 
 def _unique(values: Iterable[str]) -> List[str]:

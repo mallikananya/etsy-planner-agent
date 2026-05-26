@@ -26,6 +26,7 @@ def test_prepare_etsy_draft_payload_uses_primary_customer_files(tmp_path):
     assert payload["upload_plan"]["ready_for_draft"] is True
     assert payload["upload_plan"]["digital_file_count"] == 2
     assert payload["review_warnings"] == []
-    assert "exports/png/listing-images/01_hero.png" in payload["preview_assets"]
-    assert "exports/png/listing-images/03_bundle_overview.png" in payload["preview_assets"]
-    assert "exports/png/listing-images/08_mobile_thumbnail.png" in payload["preview_assets"]
+    assert "exports/png/listing-images/01_hero_thumbnail.png" in payload["preview_assets"]
+    assert "exports/png/listing-images/03_yearly_monthly_planning.png" in payload["preview_assets"]
+    assert "exports/png/listing-images/10_soft_life_story.png" in payload["preview_assets"]
+    assert all("product-page-previews" not in path for path in payload["upload_plan"]["listing_images"])

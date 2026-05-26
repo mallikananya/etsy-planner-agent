@@ -1,3 +1,5 @@
+from planner_generator.listing_assets.carousel import write_etsy_listing_carousel
+from planner_generator.listing_assets.description_copy import generate_listing_description
 from planner_generator.listing_assets.metadata import generate_listing_metadata
 
-__all__ = ["generate_listing_metadata"]
+__all__ = ["generate_listing_description", "generate_listing_metadata", "write_etsy_listing_carousel"]

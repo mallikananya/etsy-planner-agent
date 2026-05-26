@@ -314,13 +314,14 @@ planner_specs      Declarative content and bundle definitions
 theme_engine       Reusable color, typography, and spacing decisions
 layout_engine      Page sizing, margins, and section placement
 rendering          Deterministic drawing primitives and PDF output
-exports            Customer-facing file generation
+product_generation Functional planner PDFs, page PDFs, product previews, and customer ZIPs
+exports            Pipeline orchestration and bundle manifests
 packaging          ZIP assembly and bundle manifests
 market_intelligence Live trend signal ranking and niche brief creation
-listing_assets     Listing text and preview asset foundations
+listing_assets     Etsy listing metadata and dedicated marketing carousel graphics
 seo                Metadata and tag generation foundations
 etsy_integration   Future draft listing API boundary
 cli                Operator-friendly commands
 ```
 
-The guiding rule: specs describe what a planner page contains; renderers decide how to draw it for a target format.
+The guiding rule: product generation and Etsy listing image generation are separate pipelines. Product generation optimizes for usable planner files, clean typography, print quality, and functional organization. Etsy listing image generation optimizes for campaign-style marketing graphics, aspirational positioning, staged mockups, editorial typography, and conversion.

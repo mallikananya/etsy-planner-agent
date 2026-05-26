@@ -27,4 +27,4 @@ def test_sample_bundle_exports_with_each_theme(theme_path, tmp_path):
 
     assert result.manifest_path.exists()
     assert (result.output_dir / "exports/pdf/us-letter/wellness_starter_us-letter_complete.pdf").exists()
-    assert (result.output_dir / "exports/png/listing-images/01_hero.png").exists()
+    assert (result.output_dir / "exports/png/listing-images/01_hero_thumbnail.png").exists()

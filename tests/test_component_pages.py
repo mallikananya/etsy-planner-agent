@@ -48,6 +48,6 @@ def test_component_showcase_bundle_exports(tmp_path):
     assert sum(page.repeat for page in bundle.pages) * bundle.sequence_repeat == 10
     assert (result.output_dir / "exports/pdf/us-letter/component_showcase_us-letter_complete.pdf").exists()
     assert (result.output_dir / "exports/pdf/a4/050_blank_lined_notes_50.pdf").exists()
-    assert (result.output_dir / "exports/png/page-previews/05_sunday_reset_05.png").exists()
+    assert (result.output_dir / "exports/png/product-page-previews/05_sunday_reset_05.png").exists()
     combined_pdf = (result.output_dir / "exports/pdf/us-letter/component_showcase_us-letter_complete.pdf").read_bytes()
     assert b"/Count 50" in combined_pdf
