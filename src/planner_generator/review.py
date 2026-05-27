@@ -115,6 +115,7 @@ def build_review_dashboard(
 
     listing_images = _paths(bundle_dir, data.get("listing_image_files", []))
     product_previews = _paths(bundle_dir, data.get("product_preview_files", []))
+    mockups = _paths(bundle_dir, data.get("mockup_files", []))
     primary_files = _paths(bundle_dir, data.get("primary_customer_files", []))
     individual_pages = _paths(bundle_dir, _us_letter_pages(data.get("individual_page_files", [])))
     zip_file = bundle_dir / str(data.get("zip_file", ""))
@@ -129,7 +130,7 @@ def build_review_dashboard(
 
     title = _read_optional(bundle_dir / "listing" / "title.txt")
     description = _read_optional(bundle_dir / "listing" / "description.txt")
-    tags = _read_tags(bundle_dir / "listing" / "tags.json")
+    tags = _read_tags(bundle_dir / "listing" / "tags.json", bundle_dir / "listing" / "tags.txt")
     generated_at = datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds")
 
     html_text = _review_html(
@@ -141,6 +142,7 @@ def build_review_dashboard(
         description=description,
         tags=tags,
         listing_images=listing_images,
+        mockups=mockups,
         product_previews=product_previews,
         page_thumbnail_paths=page_thumbnail_paths,
         primary_files=primary_files,
@@ -374,6 +376,7 @@ def _review_html(
     description: str,
     tags: Sequence[str],
     listing_images: Sequence[Path],
+    mockups: Sequence[Path],
     product_previews: Sequence[Path],
     page_thumbnail_paths: Sequence[Path],
     primary_files: Sequence[Path],
@@ -460,6 +463,11 @@ def _review_html(
       {_figures(review_dir, listing_images)}
     </div>
 
+    <h2>PREVIEW MOCKUPS</h2>
+    <div class="grid carousel">
+      {_figures(review_dir, mockups)}
+    </div>
+
     <h2>ACTUAL PRODUCT FILES</h2>
     <ul>
       {_file_links(review_dir, all_product_files)}
@@ -520,11 +528,13 @@ def _read_optional(path: Path) -> str:
     return path.read_text(encoding="utf-8").strip() if path.exists() else ""
 
 
-def _read_tags(path: Path) -> List[str]:
-    if not path.exists():
-        return []
-    data = json.loads(path.read_text(encoding="utf-8"))
-    return [str(item) for item in data] if isinstance(data, list) else []
+def _read_tags(json_path: Path, text_path: Path) -> List[str]:
+    if json_path.exists():
+        data = json.loads(json_path.read_text(encoding="utf-8"))
+        return [str(item) for item in data] if isinstance(data, list) else []
+    if text_path.exists():
+        return [line.strip() for line in text_path.read_text(encoding="utf-8").splitlines() if line.strip()]
+    return []
 
 
 if __name__ == "__main__":
