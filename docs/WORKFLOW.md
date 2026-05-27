@@ -117,12 +117,14 @@ python -m planner_generator.workflow build-showroom
 
 Outputs:
 
-- Showroom page: `output/<bundle_id>/showroom/index.html`
-- Carousel contact sheet: `output/<bundle_id>/showroom/carousel_contact_sheet.png`
-- Product page contact sheet: `output/<bundle_id>/showroom/product_page_contact_sheet.png`
-- PDF page thumbnails: `output/<bundle_id>/showroom/page-thumbnails/`
+- Showroom page: `output/review/showroom.html`
+- Auto-generated page mockups: `output/review/assets/page-mockups/`
+- Cover mockups: `output/review/assets/cover-mockups/`
+- Device mockups: `output/review/assets/device-mockups/`
+- PDF spread previews: `output/review/assets/spreads/`
+- Bundle overview images: `output/review/assets/bundle-overview/`
 
-Inspect `output/<bundle_id>/showroom/index.html` before any Etsy work. This is the main approval surface.
+Inspect `output/review/showroom.html` before any Etsy work. This is the main approval surface and is designed to feel like an internal storefront review, not a developer artifact viewer.
 
 ## 6. Etsy Publisher
 

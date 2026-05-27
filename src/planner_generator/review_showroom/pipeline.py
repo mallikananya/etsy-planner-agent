@@ -18,9 +18,15 @@ class ShowroomResult:
 
 def build_showroom(context: WorkflowContext, review_output: str | Path | None = None) -> ShowroomResult:
     existing_manifest = json.loads(manifest_path(context.output_dir).read_text(encoding="utf-8"))
-    output_dir = Path(review_output) if review_output else context.output_dir / "showroom"
+    output_dir = Path(review_output) if review_output else Path("output/review")
     result = build_review_dashboard(manifest_path(context.output_dir), context.output_dir, output_dir)
-    files = [result.index_path, result.carousel_contact_sheet_path, result.product_page_contact_sheet_path, *result.page_thumbnail_paths]
+    files = [
+        result.index_path,
+        result.carousel_contact_sheet_path,
+        result.product_page_contact_sheet_path,
+        *result.page_thumbnail_paths,
+        *result.generated_mockup_paths,
+    ]
     update_manifest(
         context.output_dir,
         {
@@ -39,4 +45,3 @@ def _pipeline_manifest_update(manifest: dict) -> dict:
         "outputs": ["showroom index.html"],
     }
     return pipelines
-

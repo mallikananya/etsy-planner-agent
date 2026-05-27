@@ -64,12 +64,14 @@ def main(argv: list[str] | None = None) -> None:
             mark_completed(context.output_dir, "generate-copy", result.output_files)
             _print_done("Listing copy generated", context.output_dir, result.output_dir)
         elif args.command == "build-showroom":
-            require_completed(context.output_dir, "generate-copy")
+            require_completed(context.output_dir, "generate-product")
             result = build_showroom(context, args.review_output)
             mark_completed(context.output_dir, "build-showroom", result.output_files)
             _print_done("Showroom built", context.output_dir, result.index_path)
         elif args.command == "publish-to-etsy":
             require_completed(context.output_dir, "build-showroom")
+            require_completed(context.output_dir, "generate-listing-assets")
+            require_completed(context.output_dir, "generate-copy")
             _publish(args, context)
     except WorkflowGateError as exc:
         raise SystemExit(str(exc)) from exc
