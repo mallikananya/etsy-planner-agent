@@ -25,15 +25,17 @@ python -m planner_generator.workflow generate-product
 
 Outputs:
 
-- US Letter PDF: `output/<bundle_id>/exports/pdf/us-letter/`
-- A4 PDF: `output/<bundle_id>/exports/pdf/a4/`
-- Individual page PDFs: `output/<bundle_id>/exports/pdf/<size>/`
-- Individual page PNG previews: `output/<bundle_id>/exports/png/product-page-previews/`
-- Cover PNGs: `output/<bundle_id>/exports/png/covers/`
-- Product manifest: `output/<bundle_id>/product_manifest.json`
+- US Letter PDF: `output/products/soft_life_wellness_planner/pdf/us-letter/`
+- A4 PDF: `output/products/soft_life_wellness_planner/pdf/a4/`
+- Individual page PDFs: `output/products/soft_life_wellness_planner/individual-pages/pdf/`
+- Individual page PNG previews: `output/previews/pages/soft_life_wellness_planner/`
+- Cover PNGs: `output/previews/covers/soft_life_wellness_planner/`
+- Page contact sheets: `output/previews/contact-sheets/soft_life_wellness_planner/`
+- Product manifest: `output/products/soft_life_wellness_planner/product_manifest.json`
+- Page inventory: `output/products/soft_life_wellness_planner/page_inventory.json`
 - Aggregate manifest: `output/<bundle_id>/manifest.json`
 
-Approval gate: inspect the product PDFs, page previews, cover PNGs, and product manifest before running the next step.
+Approval gate: inspect the product PDFs, page previews, cover PNGs, contact sheets, page inventory, and product manifest before running the next step.
 
 ## 2. Preview / Mockup Renderer
 
