@@ -49,11 +49,13 @@ python -m planner_generator.workflow render-previews
 
 Outputs:
 
-- Tablet mockup: `output/<bundle_id>/exports/png/mockups/tablet_mockup.png`
-- Paper stack mockup: `output/<bundle_id>/exports/png/mockups/paper_stack_mockup.png`
-- Page spread preview: `output/<bundle_id>/exports/png/mockups/page_spread_preview.png`
-- Cover mockup: `output/<bundle_id>/exports/png/mockups/cover_mockup.png`
-- Mockup manifest: `output/<bundle_id>/exports/png/mockups/mockup_manifest.json`
+- Tablet mockups: `output/mockups/tablet/`
+- Paper stack mockups and bundle overview stacks: `output/mockups/paper_stacks/`
+- Page spread mockups: `output/mockups/spreads/`
+- Cover mockups: `output/mockups/covers/`
+- Interior closeups: `output/mockups/details/`
+- Mockup manifest with QA checks: `output/mockups/manifest.json`
+- Contact sheets: `output/mockups/mockup_contact_sheet.png` and `output/mockups/spread_contact_sheet.png`
 
 Approval gate: inspect mockups before generating Etsy listing assets.
 

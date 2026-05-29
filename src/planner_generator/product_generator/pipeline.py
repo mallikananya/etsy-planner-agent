@@ -61,6 +61,7 @@ def generate_product(context: WorkflowContext) -> ProductGeneratorResult:
         inventory_path,
     ]
     product_manifest = _write_product_manifest(context, inventory, product_dir, generated_files, primary_files, page_pngs, cover_pngs, zip_path)
+    products_manifest = _write_products_manifest(context, inventory, product_manifest, page_pngs, cover_pngs)
     compatibility_manifest = update_manifest(
         context.output_dir,
         {
@@ -98,7 +99,7 @@ def generate_product(context: WorkflowContext) -> ProductGeneratorResult:
             "files": [str(path) for path in generated_files],
         },
     )
-    generated_files.extend([product_manifest, compatibility_manifest])
+    generated_files.extend([product_manifest, products_manifest, compatibility_manifest])
     return ProductGeneratorResult(
         product_manifest_path=product_manifest,
         primary_customer_files=primary_files,
@@ -283,6 +284,32 @@ def _write_product_manifest(
     }
     manifest_path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
     return manifest_path
+
+
+def _write_products_manifest(
+    context: WorkflowContext,
+    inventory: ProductInventory,
+    product_manifest: Path,
+    page_pngs: List[Path],
+    cover_pngs: List[Path],
+) -> Path:
+    path = context.output_root / "products" / "manifest.json"
+    data = {
+        "pipeline": "product_catalog",
+        "products": [
+            {
+                "product_id": PRODUCT_SLUG,
+                "product_name": inventory.product_name,
+                "product_manifest": str(product_manifest),
+                "page_preview_dir": str(context.output_root / "previews" / "pages" / PRODUCT_SLUG),
+                "cover_preview_dir": str(context.output_root / "previews" / "covers" / PRODUCT_SLUG),
+                "page_previews": [str(page) for page in page_pngs],
+                "cover_previews": [str(cover) for cover in cover_pngs],
+            }
+        ],
+    }
+    path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    return path
 
 
 def _pdf_to_png(pdf_path: Path, png_path: Path, width: int, height: int) -> bool:

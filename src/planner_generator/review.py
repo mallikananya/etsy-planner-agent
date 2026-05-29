@@ -133,9 +133,10 @@ def build_review_dashboard(
     listing_images = _paths(bundle_dir, data.get("listing_image_files", [])) or _discover_listing_images(bundle_dir)
     existing_mockups = _paths(bundle_dir, data.get("mockup_files", []))
 
-    mockup_assets = _generate_showroom_mockups(review_dir, page_previews, cover_images, listing_images)
+    reusable_mockups = _mockups_from_manifest(data, bundle_dir)
+    mockup_assets = reusable_mockups or _generate_showroom_mockups(review_dir, page_previews, cover_images, listing_images)
     listing_images = listing_images or mockup_assets.carousel_panels
-    generated_mockups = [
+    generated_mockups = [] if reusable_mockups else [
         *mockup_assets.page_mockups,
         *mockup_assets.cover_mockups,
         *mockup_assets.device_mockups,
@@ -163,7 +164,7 @@ def build_review_dashboard(
         page_mockups=mockup_assets.page_mockups,
         cover_images=cover_images,
         cover_mockups=mockup_assets.cover_mockups,
-        device_mockups=[*existing_mockups, *mockup_assets.device_mockups],
+        device_mockups=mockup_assets.device_mockups if reusable_mockups else [*existing_mockups, *mockup_assets.device_mockups],
         spreads=mockup_assets.spreads,
         bundle_overviews=mockup_assets.bundle_overviews,
         primary_files=primary_files,
@@ -243,6 +244,46 @@ def _discover_listing_images(bundle_dir: Path) -> List[Path]:
             if images:
                 return images
     return []
+
+
+def _mockups_from_manifest(data: dict, bundle_dir: Path) -> ShowroomMockupAssets | None:
+    manifest_value = data.get("mockup_manifest") or "output/mockups/manifest.json"
+    manifest_path = _first_existing_path(bundle_dir, manifest_value)
+    if not manifest_path:
+        manifest_path = Path("output/mockups/manifest.json")
+    if not manifest_path.exists():
+        return None
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    mockups = manifest.get("mockups", [])
+    if not isinstance(mockups, list):
+        return None
+    page_mockups: List[Path] = []
+    cover_mockups: List[Path] = []
+    device_mockups: List[Path] = []
+    spreads: List[Path] = []
+    bundle_overviews: List[Path] = []
+    for item in mockups:
+        if not isinstance(item, dict):
+            continue
+        output_path = _first_existing_path(manifest_path.parent, item.get("output_path"))
+        if not output_path:
+            continue
+        mockup_type = str(item.get("mockup_type", ""))
+        if mockup_type == "paper_stack":
+            page_mockups.append(output_path)
+        elif mockup_type == "cover":
+            cover_mockups.append(output_path)
+        elif mockup_type == "tablet":
+            device_mockups.append(output_path)
+        elif mockup_type == "page_spread":
+            spreads.append(output_path)
+        elif mockup_type in {"bundle_overview_stack", "contact_sheet"}:
+            bundle_overviews.append(output_path)
+        elif mockup_type == "interior_closeup":
+            page_mockups.append(output_path)
+    if not any([page_mockups, cover_mockups, device_mockups, spreads, bundle_overviews]):
+        return None
+    return ShowroomMockupAssets(page_mockups, cover_mockups, device_mockups, spreads, bundle_overviews, [])
 
 
 def _generate_showroom_mockups(
