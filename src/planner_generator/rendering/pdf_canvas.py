@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import zlib
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List, Tuple
+
+from planner_generator.review import read_png
 
 
 def _escape_pdf_text(value: str) -> str:
@@ -24,6 +27,7 @@ class PdfCanvas:
     width: float
     height: float
     _pages: List[List[str]] = field(default_factory=lambda: [[]])
+    _images: List[Tuple[str, int, int, bytes]] = field(default_factory=list)
     _fonts: Dict[str, str] = field(
         default_factory=lambda: {
             "sans": "F1",
@@ -91,14 +95,25 @@ class PdfCanvas:
         self.set_fill(color)
         self._commands.append(f"BT /{font_ref} {size:.2f} Tf {x:.2f} {y:.2f} Td ({escaped}) Tj ET")
 
+    def image(self, path: str | Path, x: float, y: float, width: float, height: float) -> None:
+        image = read_png(Path(path))
+        name = f"Im{len(self._images) + 1}"
+        self._images.append((name, image.width, image.height, zlib.compress(bytes(image.pixels), level=6)))
+        self._commands.append(f"q {width:.2f} 0 0 {height:.2f} {x:.2f} {y:.2f} cm /{name} Do Q")
+
     def write(self, path: str | Path) -> None:
         path = Path(path)
         path.parent.mkdir(parents=True, exist_ok=True)
         page_count = len(self._pages)
         page_object_start = 3
         content_object_start = page_object_start + page_count
-        sans_font_object = content_object_start + page_count
+        image_object_start = content_object_start + page_count
+        sans_font_object = image_object_start + len(self._images)
         serif_font_object = sans_font_object + 1
+        xobject_resources = ""
+        if self._images:
+            xobject_items = " ".join(f"/{name} {image_object_start + index} 0 R" for index, (name, _, _, _) in enumerate(self._images))
+            xobject_resources = f"/XObject << {xobject_items} >> "
 
         kids = " ".join(f"{page_object_start + index} 0 R" for index in range(page_count))
         objects = [
@@ -111,7 +126,7 @@ class PdfCanvas:
             objects.append(
                 (
                     f"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 {self.width:.2f} {self.height:.2f}] "
-                    f"/Resources << /Font << /F1 {sans_font_object} 0 R /F2 {serif_font_object} 0 R >> >> "
+                    f"/Resources << /Font << /F1 {sans_font_object} 0 R /F2 {serif_font_object} 0 R >> {xobject_resources}>> "
                     f"/Contents {content_object} 0 R >>"
                 ).encode("ascii")
             )
@@ -119,6 +134,13 @@ class PdfCanvas:
         for page_commands in self._pages:
             stream = "\n".join(page_commands).encode("latin-1", errors="replace")
             objects.append(b"<< /Length " + str(len(stream)).encode("ascii") + b" >>\nstream\n" + stream + b"\nendstream")
+
+        for _, image_width, image_height, image_data in self._images:
+            header = (
+                f"<< /Type /XObject /Subtype /Image /Width {image_width} /Height {image_height} "
+                f"/ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /FlateDecode /Length {len(image_data)} >>\nstream\n"
+            ).encode("ascii")
+            objects.append(header + image_data + b"\nendstream")
 
         objects.extend(
             [

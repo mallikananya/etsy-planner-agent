@@ -32,12 +32,13 @@ def generate_listing_assets(context: WorkflowContext) -> ListingAssetResult:
     pipeline_manifest = context.output_dir / "exports" / "png" / "listing-images" / "listing_asset_manifest.json"
     named_outputs = {
         "hero_image": listing_images[0] if len(listing_images) > 0 else None,
-        "features_image": listing_images[1] if len(listing_images) > 1 else None,
-        "interior_pages_image": listing_images[2] if len(listing_images) > 2 else None,
-        "transformation_sales_image": listing_images[3] if len(listing_images) > 3 else None,
-        "cover_options_image": listing_images[4] if len(listing_images) > 4 else None,
-        "whats_included_image": listing_images[5] if len(listing_images) > 5 else None,
+        "interior_preview_image": listing_images[1] if len(listing_images) > 1 else None,
+        "features_image": listing_images[2] if len(listing_images) > 2 else None,
+        "whats_included_image": listing_images[3] if len(listing_images) > 3 else None,
+        "transformation_sales_image": listing_images[4] if len(listing_images) > 4 else None,
+        "cover_options_image": listing_images[5] if len(listing_images) > 5 else None,
         "compatibility_image": listing_images[6] if len(listing_images) > 6 else None,
+        "detail_closeup_image": listing_images[7] if len(listing_images) > 7 else None,
     }
     pipeline_manifest.write_text(
         json.dumps(
@@ -85,13 +86,13 @@ def _pipeline_manifest_update(manifest: dict) -> dict:
         "purpose": "Creates the Etsy carousel images.",
         "outputs": [
             "hero image",
+            "interior preview image",
             "features image",
-            "interior pages image",
             "what's included image",
-            "compatibility image",
+            "transformation/lifestyle image",
             "cover options image",
-            "transformation/sales image",
+            "device/print compatibility image",
+            "detail close-up image",
         ],
     }
     return pipelines
-

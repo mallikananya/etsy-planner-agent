@@ -7,13 +7,13 @@ import math
 import os
 import shutil
 import struct
-import subprocess
 import zlib
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Iterable, List, Sequence
+from typing import Dict, Iterable, List, Sequence
 
+from planner_generator.rendering.pdf_to_png import pdf_to_png
 from planner_generator.rendering.png_canvas import _GLYPHS
 
 
@@ -98,6 +98,7 @@ class ShowroomMockupAssets:
     spreads: List[Path]
     bundle_overviews: List[Path]
     carousel_panels: List[Path]
+    detail_mockups: List[Path]
 
 
 def main() -> None:
@@ -131,18 +132,21 @@ def build_review_dashboard(
     primary_files = _paths(product_dir, product_data.get("primary_customer_files", [])) or _paths(bundle_dir, data.get("primary_customer_files", []))
     zip_file = _first_existing_path(product_dir, product_data.get("zip_file")) or _first_existing_path(bundle_dir, data.get("zip_file"))
     listing_images = _paths(bundle_dir, data.get("listing_image_files", [])) or _discover_listing_images(bundle_dir)
+    listing_thumbnail_images = _discover_listing_thumbnails(bundle_dir, listing_images)
     existing_mockups = _paths(bundle_dir, data.get("mockup_files", []))
 
     reusable_mockups = _mockups_from_manifest(data, bundle_dir)
     mockup_assets = reusable_mockups or _generate_showroom_mockups(review_dir, page_previews, cover_images, listing_images)
     listing_images = listing_images or mockup_assets.carousel_panels
+    device_mockups = mockup_assets.device_mockups if reusable_mockups else [*existing_mockups, *mockup_assets.device_mockups]
     generated_mockups = [] if reusable_mockups else [
         *mockup_assets.page_mockups,
         *mockup_assets.cover_mockups,
-        *mockup_assets.device_mockups,
+        *device_mockups,
         *mockup_assets.spreads,
         *mockup_assets.bundle_overviews,
         *mockup_assets.carousel_panels,
+        *mockup_assets.detail_mockups,
     ]
 
     carousel_sheet = review_dir / "assets" / "carousel_contact_sheet.png"
@@ -151,6 +155,23 @@ def build_review_dashboard(
     _write_contact_sheet(mockup_assets.page_mockups, product_sheet, "PLANNER MOCKUP WALL", columns=5, thumb_width=250, thumb_height=312)
 
     generated_at = datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds")
+    listing_copy = _listing_copy_data(bundle_dir)
+    asset_map, asset_manifest, packaged_assets = _prepare_showroom_assets(
+        review_dir,
+        {
+            "carousel": listing_images,
+            "mobile_thumbnails": listing_thumbnail_images,
+            "product_pages": page_previews,
+            "page_mockups": mockup_assets.page_mockups,
+            "cover_images": cover_images,
+            "cover_mockups": mockup_assets.cover_mockups,
+            "device_mockups": device_mockups,
+            "spread_mockups": mockup_assets.spreads,
+            "detail_crops": mockup_assets.detail_mockups,
+            "bundle_overviews": mockup_assets.bundle_overviews,
+            "review_sheets": [carousel_sheet, product_sheet],
+        },
+    )
 
     html_text = _review_html(
         data=data,
@@ -160,22 +181,26 @@ def build_review_dashboard(
         review_dir=review_dir,
         generated_at=generated_at,
         listing_images=listing_images,
+        listing_thumbnail_images=listing_thumbnail_images,
         page_previews=page_previews,
         page_mockups=mockup_assets.page_mockups,
         cover_images=cover_images,
         cover_mockups=mockup_assets.cover_mockups,
-        device_mockups=mockup_assets.device_mockups if reusable_mockups else [*existing_mockups, *mockup_assets.device_mockups],
+        device_mockups=device_mockups,
         spreads=mockup_assets.spreads,
         bundle_overviews=mockup_assets.bundle_overviews,
+        detail_mockups=mockup_assets.detail_mockups,
         primary_files=primary_files,
         zip_file=zip_file if zip_file and zip_file.exists() else None,
         carousel_sheet=carousel_sheet,
         product_sheet=product_sheet,
+        listing_copy=listing_copy,
+        asset_map=asset_map,
     )
     showroom_path = review_dir / "showroom.html"
     showroom_path.write_text(html_text, encoding="utf-8")
     (review_dir / "index.html").write_text(html_text, encoding="utf-8")
-    return ReviewResult(showroom_path, carousel_sheet, product_sheet, [], generated_mockups)
+    return ReviewResult(showroom_path, carousel_sheet, product_sheet, [asset_manifest, *packaged_assets], generated_mockups)
 
 
 def _resolve_manifest(manifest_path: str | Path | None, bundle_output: str | Path | None) -> Path:
@@ -236,6 +261,8 @@ def _paths(base: Path, values: Iterable[object]) -> List[Path]:
 def _discover_listing_images(bundle_dir: Path) -> List[Path]:
     candidates = [
         bundle_dir / "exports" / "png" / "listing-images",
+        bundle_dir.parent / "listing_assets" / "carousel",
+        Path("output/listing_assets/carousel"),
         Path("output/wellness_starter/exports/png/listing-images"),
     ]
     for directory in candidates:
@@ -244,6 +271,45 @@ def _discover_listing_images(bundle_dir: Path) -> List[Path]:
             if images:
                 return images
     return []
+
+
+def _discover_listing_thumbnails(bundle_dir: Path, listing_images: Sequence[Path]) -> List[Path]:
+    candidates = [
+        bundle_dir.parent / "listing_assets" / "mobile_thumbnails",
+        Path("output/listing_assets/mobile_thumbnails"),
+    ]
+    for directory in candidates:
+        if directory.exists():
+            images = sorted(directory.glob("*.png"))
+            if images:
+                return images
+    return list(listing_images)
+
+
+def _prepare_showroom_assets(review_dir: Path, groups: Dict[str, Sequence[Path]]) -> tuple[Dict[str, Path], Path, List[Path]]:
+    asset_root = review_dir / "showroom_assets"
+    if asset_root.exists():
+        shutil.rmtree(asset_root)
+    asset_root.mkdir(parents=True, exist_ok=True)
+    mapping: Dict[str, Path] = {}
+    copied: List[Path] = []
+    manifest_groups: Dict[str, List[Dict[str, str]]] = {}
+    for group, paths in groups.items():
+        group_dir = asset_root / _slug(group)
+        group_items: List[Dict[str, str]] = []
+        for index, source in enumerate(paths, start=1):
+            if not source or not source.exists() or not source.is_file():
+                continue
+            target = group_dir / f"{index:02d}_{_slug(source.stem)}{source.suffix.lower()}"
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source, target)
+            mapping[str(source.resolve())] = target
+            copied.append(target)
+            group_items.append({"source": str(source), "asset": str(target)})
+        manifest_groups[group] = group_items
+    manifest_path = asset_root / "asset_manifest.json"
+    manifest_path.write_text(json.dumps({"asset_root": str(asset_root), "groups": manifest_groups}, indent=2) + "\n", encoding="utf-8")
+    return mapping, manifest_path, copied
 
 
 def _mockups_from_manifest(data: dict, bundle_dir: Path) -> ShowroomMockupAssets | None:
@@ -262,6 +328,7 @@ def _mockups_from_manifest(data: dict, bundle_dir: Path) -> ShowroomMockupAssets
     device_mockups: List[Path] = []
     spreads: List[Path] = []
     bundle_overviews: List[Path] = []
+    detail_mockups: List[Path] = []
     for item in mockups:
         if not isinstance(item, dict):
             continue
@@ -280,10 +347,10 @@ def _mockups_from_manifest(data: dict, bundle_dir: Path) -> ShowroomMockupAssets
         elif mockup_type in {"bundle_overview_stack", "contact_sheet"}:
             bundle_overviews.append(output_path)
         elif mockup_type == "interior_closeup":
-            page_mockups.append(output_path)
+            detail_mockups.append(output_path)
     if not any([page_mockups, cover_mockups, device_mockups, spreads, bundle_overviews]):
         return None
-    return ShowroomMockupAssets(page_mockups, cover_mockups, device_mockups, spreads, bundle_overviews, [])
+    return ShowroomMockupAssets(page_mockups, cover_mockups, device_mockups, spreads, bundle_overviews, [], detail_mockups)
 
 
 def _generate_showroom_mockups(
@@ -334,7 +401,7 @@ def _generate_showroom_mockups(
     if not listing_images:
         carousel_panels = _write_review_carousel_panels(carousel_dir, page_previews, cover_images, device_mockups, spreads)
 
-    return ShowroomMockupAssets(page_mockups, cover_mockups, device_mockups, spreads, bundle_overviews, carousel_panels)
+    return ShowroomMockupAssets(page_mockups, cover_mockups, device_mockups, spreads, bundle_overviews, carousel_panels, [])
 
 
 def _write_paper_stack_mockup(source_path: Path, output_path: Path) -> Path:
@@ -503,6 +570,11 @@ def _display_name(stem: str) -> str:
     return cleaned.replace("_", " ").replace("-", " ").title()
 
 
+def _slug(value: str) -> str:
+    chars = [char.lower() if char.isalnum() else "_" for char in str(value)]
+    return "_".join(part for part in "".join(chars).split("_") if part) or "asset"
+
+
 def _us_letter_pages(values: object) -> List[str]:
     result: List[str] = []
     for value in values if isinstance(values, list) else []:
@@ -514,21 +586,10 @@ def _us_letter_pages(values: object) -> List[str]:
 
 def _render_pdf_page_thumbnails(pdf_paths: Sequence[Path], thumbnail_dir: Path) -> List[Path]:
     thumbnail_dir.mkdir(parents=True, exist_ok=True)
-    if not shutil.which("sips"):
-        return []
     thumbnails: List[Path] = []
     for pdf_path in pdf_paths:
         output_path = thumbnail_dir / f"{pdf_path.stem}.png"
-        try:
-            subprocess.run(
-                ["sips", "-s", "format", "png", "-z", "420", "326", str(pdf_path), "--out", str(output_path)],
-                check=True,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-            )
-        except (OSError, subprocess.CalledProcessError):
-            continue
-        if output_path.exists():
+        if pdf_to_png(pdf_path, output_path, width=326, height=420):
             thumbnails.append(output_path)
     return thumbnails
 
@@ -697,6 +758,7 @@ def _review_html(
     review_dir: Path,
     generated_at: str,
     listing_images: Sequence[Path],
+    listing_thumbnail_images: Sequence[Path],
     page_previews: Sequence[Path],
     page_mockups: Sequence[Path],
     cover_images: Sequence[Path],
@@ -704,14 +766,24 @@ def _review_html(
     device_mockups: Sequence[Path],
     spreads: Sequence[Path],
     bundle_overviews: Sequence[Path],
+    detail_mockups: Sequence[Path],
     primary_files: Sequence[Path],
     zip_file: Path | None,
     carousel_sheet: Path,
     product_sheet: Path,
+    listing_copy: dict,
+    asset_map: Dict[str, Path],
 ) -> str:
     all_product_files = list(primary_files) + ([zip_file] if zip_file else [])
     product_name = str(product_data.get("product_name") or data.get("bundle_name") or "Planner Review")
     page_count = int(product_data.get("page_count") or len(page_previews))
+    collection = str(listing_copy.get("collection_positioning", {}).get("collection_name", "Soft Life Series"))
+    category = str(listing_copy.get("collection_positioning", {}).get("category_name", "Planner Collection"))
+    theme_name = str(product_data.get("theme_name") or data.get("theme_name") or data.get("theme_id") or "Editorial Planner System")
+    visual_language = [str(item) for item in product_data.get("visual_language", []) if str(item).strip()]
+    qa_items = _qa_summary(product_data, listing_images, listing_thumbnail_images, page_previews, cover_images, device_mockups, spreads, detail_mockups, all_product_files)
+    page_groups = _page_category_groups(product_data, page_previews)
+    section_dividers = _section_divider_paths(product_data, page_previews)
     return f"""<!doctype html>
 <html lang="en">
 <head>
@@ -728,20 +800,26 @@ def _review_html(
       --line: #d9cbbd;
       --accent: #b87c6e;
       --shadow: rgba(66, 48, 36, 0.20);
+      --success: #557662;
+      --warning: #a77938;
+      --fail: #9b4e4b;
     }}
     * {{ box-sizing: border-box; }}
     html {{ scroll-behavior: smooth; }}
     body {{ margin: 0; background: var(--page); color: var(--ink); font-family: Inter, Helvetica, Arial, sans-serif; line-height: 1.45; }}
     a {{ color: inherit; }}
-    .hero {{ min-height: 88vh; padding: 58px clamp(22px, 6vw, 86px) 42px; display: grid; grid-template-columns: minmax(0, 0.82fr) minmax(320px, 1fr); gap: clamp(28px, 5vw, 72px); align-items: center; background: linear-gradient(90deg, rgba(255,253,248,0.92), rgba(255,253,248,0.36)), var(--page); border-bottom: 1px solid var(--line); }}
-    .eyebrow {{ margin: 0 0 22px; color: var(--accent); font-size: 12px; letter-spacing: 0.16em; text-transform: uppercase; }}
+    button {{ font: inherit; }}
+    .hero {{ min-height: 92vh; padding: 58px clamp(22px, 6vw, 86px) 42px; display: grid; grid-template-columns: minmax(0, 0.82fr) minmax(320px, 1fr); gap: clamp(28px, 5vw, 72px); align-items: center; background: linear-gradient(90deg, rgba(255,253,248,0.94), rgba(255,253,248,0.44)), var(--page); border-bottom: 1px solid var(--line); }}
+    .eyebrow {{ margin: 0 0 18px; color: var(--accent); font-size: 12px; letter-spacing: 0.16em; text-transform: uppercase; }}
     h1, h2, h3 {{ font-family: Georgia, 'Times New Roman', serif; font-weight: 400; letter-spacing: 0; }}
     h1 {{ margin: 0; font-size: clamp(46px, 7vw, 88px); line-height: 0.92; max-width: 780px; }}
-    .hero-copy p {{ max-width: 620px; color: var(--smoke); font-size: 17px; margin: 28px 0 0; }}
-    .hero-mockup {{ position: relative; min-height: 520px; }}
-    .hero-mockup img {{ position: absolute; width: min(68%, 560px); max-height: 78vh; object-fit: contain; filter: drop-shadow(0 26px 38px var(--shadow)); background: var(--paper); }}
-    .hero-mockup img:first-child {{ left: 8%; top: 8%; z-index: 2; }}
-    .hero-mockup img:nth-child(2) {{ right: 0; top: 0; z-index: 1; opacity: 0.94; }}
+    .hero-copy p {{ max-width: 650px; color: var(--smoke); font-size: 17px; margin: 24px 0 0; }}
+    .meta-line {{ display: flex; flex-wrap: wrap; gap: 10px; margin: 26px 0 0; color: var(--smoke); }}
+    .meta-line span {{ border: 1px solid var(--line); background: rgba(255,253,248,0.68); padding: 8px 10px; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; }}
+    .hero-mockup {{ min-height: 560px; display: grid; align-items: center; }}
+    .hero-frame {{ position: relative; background: var(--paper); border: 1px solid var(--line); box-shadow: 0 34px 70px var(--shadow); padding: 18px; }}
+    .hero-frame img {{ width: 100%; display: block; }}
+    .hero-frame .caption {{ color: var(--mist); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; margin-top: 12px; }}
     .stats {{ display: flex; flex-wrap: wrap; gap: 12px; margin-top: 34px; }}
     .stat {{ min-width: 134px; padding: 16px 18px; background: rgba(255,253,248,0.72); border: 1px solid var(--line); }}
     .stat strong {{ display: block; font-family: Georgia, 'Times New Roman', serif; font-size: 28px; font-weight: 400; }}
@@ -750,16 +828,38 @@ def _review_html(
     .nav a {{ white-space: nowrap; text-decoration: none; color: var(--smoke); border: 1px solid transparent; padding: 8px 12px; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; }}
     .nav a:hover {{ border-color: var(--line); background: var(--paper); }}
     main {{ padding: 34px clamp(18px, 4vw, 52px) 80px; }}
-    section {{ margin: 0 auto 48px; max-width: 1500px; padding: clamp(26px, 4vw, 48px); background: rgba(255,253,248,0.64); border: 1px solid rgba(217,203,189,0.9); box-shadow: 0 22px 70px rgba(81, 62, 45, 0.08); }}
+    section {{ margin: 0 auto 48px; max-width: 1540px; padding: clamp(26px, 4vw, 48px); background: rgba(255,253,248,0.64); border: 1px solid rgba(217,203,189,0.9); box-shadow: 0 22px 70px rgba(81, 62, 45, 0.08); }}
     .section-head {{ display: flex; justify-content: space-between; gap: 24px; align-items: end; margin-bottom: 24px; border-bottom: 1px solid var(--line); padding-bottom: 18px; }}
     .section-label {{ color: var(--accent); font-size: 12px; letter-spacing: 0.16em; text-transform: uppercase; }}
     h2 {{ margin: 8px 0 0; font-size: clamp(30px, 4.2vw, 54px); line-height: 1; }}
     .section-note {{ max-width: 420px; color: var(--smoke); font-size: 14px; }}
+    .qa-strip {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; margin: 0 0 28px; }}
+    .qa-card {{ background: var(--paper); border: 1px solid var(--line); padding: 16px; }}
+    .qa-card strong {{ display: block; font-family: Georgia, 'Times New Roman', serif; font-weight: 400; font-size: 20px; }}
+    .qa-card span {{ display: inline-block; margin: 0 0 10px; padding: 4px 7px; border-radius: 999px; color: #fff; font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; }}
+    .qa-card p {{ margin: 0; color: var(--smoke); font-size: 12px; }}
+    .qa-pass span {{ background: var(--success); }}
+    .qa-warning span {{ background: var(--warning); }}
+    .qa-fail span {{ background: var(--fail); }}
     .rail {{ display: grid; grid-auto-flow: column; grid-auto-columns: minmax(300px, 34vw); gap: 22px; overflow-x: auto; padding: 10px 2px 24px; scroll-snap-type: x mandatory; }}
     .rail.large {{ grid-auto-columns: minmax(560px, 68vw); }}
     .gallery-card {{ margin: 0; background: var(--paper); border: 1px solid var(--line); box-shadow: 0 18px 34px rgba(69, 52, 38, 0.12); scroll-snap-align: start; }}
-    .gallery-card img {{ width: 100%; height: auto; display: block; background: var(--paper); }}
+    .image-button {{ display: block; width: 100%; padding: 0; border: 0; background: transparent; cursor: zoom-in; text-align: left; }}
+    .gallery-card img, .image-button img {{ width: 100%; height: auto; display: block; background: var(--paper); }}
     .gallery-card figcaption {{ padding: 13px 14px 15px; color: var(--smoke); font-size: 12px; letter-spacing: 0.04em; text-transform: uppercase; }}
+    .ordered-gallery {{ counter-reset: slide; }}
+    .ordered-gallery .gallery-card figcaption::before {{ counter-increment: slide; content: counter(slide, decimal-leading-zero) " / "; color: var(--accent); }}
+    .thumbnail-grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-top: 18px; }}
+    .thumbnail-grid .gallery-card {{ box-shadow: 0 12px 24px rgba(69, 52, 38, 0.10); }}
+    .phone-row {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 16px; margin-top: 20px; }}
+    .phone-frame {{ background: #24211e; border-radius: 32px; padding: 12px; box-shadow: 0 18px 34px rgba(47,38,30,0.18); }}
+    .phone-frame img {{ width: 100%; border-radius: 22px; display: block; }}
+    .split-review {{ display: grid; grid-template-columns: minmax(0,1fr) minmax(0,0.88fr); gap: 22px; margin-top: 24px; }}
+    .side-stack {{ display: grid; gap: 14px; }}
+    .page-group {{ margin-top: 18px; }}
+    .page-group h3 {{ font-size: 28px; margin: 26px 0 12px; }}
+    .mini-grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; }}
+    .mini-grid .gallery-card figcaption {{ font-size: 10px; }}
     .feature-grid {{ display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(320px, 0.95fr); gap: 26px; align-items: stretch; margin-bottom: 24px; }}
     .feature-grid img {{ width: 100%; height: 100%; max-height: 820px; object-fit: contain; background: var(--paper); box-shadow: 0 28px 54px var(--shadow); }}
     .approval-grid {{ display: grid; grid-template-columns: repeat(2, minmax(180px, 1fr)); gap: 14px; }}
@@ -775,52 +875,123 @@ def _review_html(
     .export-card {{ display: block; text-decoration: none; background: var(--paper); border: 1px solid var(--line); padding: 18px; min-height: 106px; }}
     .export-card strong {{ display: block; font-family: Georgia, 'Times New Roman', serif; font-weight: 400; font-size: 22px; margin-bottom: 8px; }}
     .export-card span {{ display: block; color: var(--smoke); font-size: 12px; word-break: break-word; }}
+    .copy-grid {{ display: grid; grid-template-columns: minmax(0, 1.08fr) minmax(300px, 0.92fr); gap: 22px; align-items: start; }}
+    .copy-panel {{ background: var(--paper); border: 1px solid var(--line); padding: 20px; box-shadow: 0 14px 30px rgba(69, 52, 38, 0.08); }}
+    .copy-panel h3 {{ margin: 0 0 12px; font-size: 24px; line-height: 1.1; }}
+    .listing-title {{ font-family: Georgia, 'Times New Roman', serif; font-size: clamp(28px, 3vw, 42px); line-height: 1.06; margin-bottom: 16px; }}
+    .copy-body {{ white-space: pre-wrap; color: var(--smoke); font-size: 14px; }}
+    .tag-list, .copy-lines {{ display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }}
+    .tag-list span, .copy-lines span {{ border: 1px solid var(--line); background: rgba(245,238,229,0.62); color: var(--smoke); padding: 7px 9px; font-size: 12px; }}
+    .positioning-list {{ margin: 0; padding: 0; list-style: none; color: var(--smoke); font-size: 14px; }}
+    .positioning-list li {{ border-top: 1px solid var(--line); padding: 10px 0; }}
+    .positioning-list li:first-child {{ border-top: 0; padding-top: 0; }}
+    .asset-summary {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 20px; }}
+    .asset-summary div {{ background: var(--paper); border: 1px solid var(--line); padding: 14px; }}
+    .asset-summary strong {{ display: block; font-family: Georgia, 'Times New Roman', serif; font-size: 26px; font-weight: 400; }}
+    .lightbox {{ position: fixed; inset: 0; z-index: 60; display: none; align-items: center; justify-content: center; background: rgba(31,27,24,0.88); padding: 28px; }}
+    .lightbox.open {{ display: flex; }}
+    .lightbox-panel {{ width: min(96vw, 1500px); height: min(92vh, 980px); display: grid; grid-template-rows: auto 1fr; gap: 12px; }}
+    .lightbox-bar {{ display: flex; justify-content: space-between; gap: 12px; align-items: center; color: #fff; }}
+    .lightbox-controls {{ display: flex; gap: 8px; }}
+    .lightbox button {{ border: 1px solid rgba(255,255,255,0.34); color: #fff; background: rgba(255,255,255,0.08); padding: 8px 11px; cursor: pointer; }}
+    .lightbox-viewport {{ overflow: auto; background: rgba(255,253,248,0.08); border: 1px solid rgba(255,255,255,0.18); display: grid; place-items: center; }}
+    .lightbox img {{ max-width: 100%; transform-origin: center center; transition: transform 160ms ease; }}
     .muted {{ color: var(--mist); }}
-    @media (max-width: 860px) {{ .hero, .feature-grid {{ grid-template-columns: 1fr; }} .hero-mockup {{ min-height: 420px; }} section {{ padding: 24px 18px; }} .rail.large {{ grid-auto-columns: minmax(300px, 86vw); }} .compare-grid {{ grid-template-columns: 1fr; }} }}
+    @media (max-width: 860px) {{ .hero, .feature-grid, .copy-grid, .split-review {{ grid-template-columns: 1fr; }} .hero-mockup {{ min-height: auto; }} section {{ padding: 24px 18px; }} .rail.large {{ grid-auto-columns: minmax(300px, 86vw); }} .compare-grid {{ grid-template-columns: 1fr; }} }}
   </style>
 </head>
 <body>
   <header class="hero">
     <div class="hero-copy">
-      <p class="eyebrow">Internal Creative Direction Review</p>
+      <p class="eyebrow">Section A / Hero Overview</p>
       <h1>{_e(product_name)}</h1>
-      <p>One storefront-style surface for judging the raw product, mockups, covers, carousel readiness, exports, and premium consistency before anything is published.</p>
+      <p>{_e(collection)} · {_e(category)}. A single premium approval surface for judging whether the planner, storefront assets, copy, exports, and buyer-facing promise feel commercially cohesive before Etsy upload.</p>
+      <div class="meta-line"><span>{_e(theme_name)}</span><span>{_e(", ".join(visual_language[:2]) if visual_language else "soft luxury stationery")}</span><span>{_e(generated_at)}</span></div>
       <div class="stats">
         <div class="stat"><strong>{page_count}</strong><span>Planner Pages</span></div>
-        <div class="stat"><strong>{len(cover_images)}</strong><span>Cover Variants</span></div>
-        <div class="stat"><strong>{len(page_mockups)}</strong><span>Auto Mockups</span></div>
-        <div class="stat"><strong>{len(primary_files)}</strong><span>PDF Formats</span></div>
+        <div class="stat"><strong>{len(listing_images)}</strong><span>Carousel Slides</span></div>
+        <div class="stat"><strong>{len(cover_mockups or cover_images)}</strong><span>Cover Variants</span></div>
+        <div class="stat"><strong>{len(all_product_files)}</strong><span>Exports</span></div>
       </div>
     </div>
-    <div class="hero-mockup">{_hero_images(review_dir, cover_mockups, page_mockups)}</div>
+    <div class="hero-mockup">{_hero_image(review_dir, listing_images, cover_mockups, page_mockups, asset_map)}</div>
   </header>
   <nav class="nav">
-    <a href="#carousel">Section A</a><a href="#interiors">Section B</a><a href="#covers">Section C</a><a href="#devices">Section D</a><a href="#bundle">Section E</a><a href="#exports">Section F</a>
+    <a href="#hero-review">Hero</a><a href="#carousel">Carousel</a><a href="#product">Product</a><a href="#mockups">Mockups</a><a href="#copy">Copy</a><a href="#exports">Exports</a>
   </nav>
   <main>
-    <section id="carousel">{_section_head("SECTION A", "Etsy Carousel Preview", "Large-format carousel review using generated listing images when available, or review panels built from real product pages.")}
-      <div class="rail large">{_gallery_cards(review_dir, listing_images, "Carousel")}</div>
+    <section id="hero-review">{_section_head("SECTION A", "Creative Direction Overview", "A concise read on the brand system, storefront promise, and readiness signals.")}
+      <div class="qa-strip">{_qa_cards(qa_items)}</div>
+      <div class="asset-summary">
+        <div><strong>{len(page_previews)}</strong><span>Actual page previews</span></div>
+        <div><strong>{len(spreads)}</strong><span>Rendered spreads</span></div>
+        <div><strong>{len(device_mockups)}</strong><span>Device mockups</span></div>
+        <div><strong>{len(detail_mockups)}</strong><span>Detail crops</span></div>
+      </div>
     </section>
-    <section id="interiors">{_section_head("SECTION B", "Actual Planner Interior Preview", "Every interior page is automatically rendered into a storefront-style paper mockup. Raw pages are secondary and available only for comparison.")}
-      <div class="feature-grid">{_single_feature_image(review_dir, page_mockups)}<div class="approval-grid">{_approval_cards(product_data, page_count, len(page_mockups), len(cover_images))}</div></div>
-      <div class="rail">{_gallery_cards(review_dir, page_mockups, "Interior Mockup")}</div>
-      <div class="compare-grid">{_comparison_pairs(review_dir, page_previews, page_mockups)}</div>
+    <section id="carousel">{_section_head("SECTION B", "Etsy Carousel Review", "Full carousel order, large preview, thumbnail strip, mobile simulation, and side-by-side cohesion checks.")}
+      {_carousel_review_html(review_dir, listing_images, listing_thumbnail_images, asset_map)}
     </section>
-    <section id="covers">{_section_head("SECTION C", "Cover Collection", "Primary, alternate, and muted seasonal covers presented as sellable digital stationery.")}
-      <div class="rail">{_gallery_cards(review_dir, cover_mockups or cover_images, "Cover")}</div>
+    <section id="product">{_section_head("SECTION C", "Actual Product Preview", "Rendered planner pages grouped by product structure, with spreads, section dividers, and cover system checks.")}
+      {_product_review_html(review_dir, page_groups, section_dividers, page_previews, cover_images, cover_mockups, spreads, asset_map)}
     </section>
-    <section id="devices">{_section_head("SECTION D", "Device Mockups", "Tablet and mobile previews generated automatically from real planner interiors.")}
-      <div class="rail">{_gallery_cards(review_dir, device_mockups, "Device")}</div>
+    <section id="mockups">{_section_head("SECTION D", "Mockup Review", "Tablet, paper stack, spread, detail crop, and lifestyle-style compositions presented as buyer-facing proof.")}
+      {_mockup_review_html(review_dir, device_mockups, page_mockups, spreads, detail_mockups, bundle_overviews, asset_map)}
     </section>
-    <section id="bundle">{_section_head("SECTION E", "Full Bundle Overview", "A complete visual scan of the planner rhythm, actual PDF spreads, and page system.")}
-      <div class="rail large">{_gallery_cards(review_dir, bundle_overviews, "Bundle")}</div>
-      <div class="rail large">{_gallery_cards(review_dir, spreads, "PDF Spread")}</div>
+    <section id="copy">{_section_head("SECTION E", "Copy Review", "Etsy title, description, tags, carousel marketing copy, and collection naming in one conversion-focused read.")}
+      {_copy_review_html(listing_copy)}
     </section>
-    <section id="exports">{_section_head("SECTION F", "Export Deliverables", "Final files to inspect or deliver after approval. This section links directly to artifacts, without making the gallery feel like a file browser.")}
+    <section id="exports">{_section_head("SECTION F", "Exports + Deliverables", "Generated files, download links, output paths, and review sheets for final approval.")}
       <div class="export-grid">{_export_cards(review_dir, all_product_files, product_data, product_dir, carousel_sheet, product_sheet)}</div>
-      <p class="muted">Generated {_e(generated_at)} · Source manifest: {_e(str(product_dir / "product_manifest.json"))}</p>
+      <p class="muted">Showroom assets: output/review/showroom_assets · Source manifest: {_e(str(product_dir / "product_manifest.json"))}</p>
     </section>
   </main>
+  <div class="lightbox" id="lightbox" aria-hidden="true">
+    <div class="lightbox-panel">
+      <div class="lightbox-bar">
+        <span id="lightboxTitle">Image preview</span>
+        <div class="lightbox-controls">
+          <button type="button" data-zoom="out">Zoom -</button>
+          <button type="button" data-zoom="in">Zoom +</button>
+          <button type="button" data-close>Close</button>
+        </div>
+      </div>
+      <div class="lightbox-viewport"><img id="lightboxImage" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==" alt=""></div>
+    </div>
+  </div>
+  <script>
+    const lightbox = document.getElementById('lightbox');
+    const lightboxImage = document.getElementById('lightboxImage');
+    const lightboxTitle = document.getElementById('lightboxTitle');
+    let zoom = 1;
+    function openLightbox(src, title) {{
+      zoom = 1;
+      lightboxImage.src = src;
+      lightboxImage.style.transform = 'scale(1)';
+      lightboxTitle.textContent = title || 'Image preview';
+      lightbox.classList.add('open');
+      lightbox.setAttribute('aria-hidden', 'false');
+    }}
+    function closeLightbox() {{
+      lightbox.classList.remove('open');
+      lightbox.setAttribute('aria-hidden', 'true');
+      lightboxImage.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==';
+    }}
+    document.querySelectorAll('[data-lightbox-src]').forEach((button) => {{
+      button.addEventListener('click', () => openLightbox(button.dataset.lightboxSrc, button.dataset.lightboxTitle));
+    }});
+    document.querySelector('[data-close]').addEventListener('click', closeLightbox);
+    document.querySelector('[data-zoom="in"]').addEventListener('click', () => {{
+      zoom = Math.min(3, zoom + 0.25);
+      lightboxImage.style.transform = `scale(${{zoom}})`;
+    }});
+    document.querySelector('[data-zoom="out"]').addEventListener('click', () => {{
+      zoom = Math.max(0.5, zoom - 0.25);
+      lightboxImage.style.transform = `scale(${{zoom}})`;
+    }});
+    lightbox.addEventListener('click', (event) => {{ if (event.target === lightbox) closeLightbox(); }});
+    document.addEventListener('keydown', (event) => {{ if (event.key === 'Escape') closeLightbox(); }});
+  </script>
 </body>
 </html>
 """
@@ -834,6 +1005,198 @@ def _section_head(label: str, title: str, note: str) -> str:
           <h2>{_e(title)}</h2>
         </div>
         <p class="section-note">{_e(note)}</p>
+      </div>
+"""
+
+
+def _qa_summary(
+    product_data: dict,
+    listing_images: Sequence[Path],
+    listing_thumbnail_images: Sequence[Path],
+    page_previews: Sequence[Path],
+    cover_images: Sequence[Path],
+    device_mockups: Sequence[Path],
+    spreads: Sequence[Path],
+    detail_mockups: Sequence[Path],
+    export_files: Sequence[Path],
+) -> List[Dict[str, str]]:
+    design = product_data.get("design_system", {})
+    typography = isinstance(design, dict) and bool(design.get("typography_scale"))
+    spacing = isinstance(design, dict) and bool(design.get("spacing_system")) and bool(design.get("margin_system"))
+    color = isinstance(design, dict) and bool(design.get("accent_system"))
+    export_names = [path.name.lower() for path in export_files]
+    export_complete = any("us-letter" in name for name in export_names) and any("_a4_" in name for name in export_names) and any(name.endswith(".zip") for name in export_names)
+    critical_missing = [
+        name
+        for name, present in [
+            ("carousel", bool(listing_images)),
+            ("product pages", bool(page_previews)),
+            ("covers", bool(cover_images)),
+            ("device mockups", bool(device_mockups)),
+            ("spreads", bool(spreads)),
+        ]
+        if not present
+    ]
+    thumbnail_status = "pass" if listing_images and len(listing_thumbnail_images) >= len(listing_images) else "warning"
+    missing_status = "fail" if critical_missing else ("warning" if not detail_mockups else "pass")
+    return [
+        {"label": "Typography", "status": "pass" if typography else "warning", "detail": "Defined product type scale" if typography else "Typography scale not found in manifest"},
+        {"label": "Spacing", "status": "pass" if spacing else "warning", "detail": "Spacing and margin systems available" if spacing else "Spacing metadata needs review"},
+        {"label": "Color", "status": "pass" if color else "warning", "detail": "Accent system detected" if color else "Color system metadata missing"},
+        {"label": "Thumbnails", "status": thumbnail_status, "detail": f"{len(listing_thumbnail_images)} mobile thumbnails for {len(listing_images)} carousel slides"},
+        {"label": "Exports", "status": "pass" if export_complete else "fail", "detail": "US Letter, A4, and customer ZIP found" if export_complete else "Missing one or more delivery exports"},
+        {"label": "Assets", "status": missing_status, "detail": "All critical visual groups present" if not critical_missing else "Missing: " + ", ".join(critical_missing)},
+    ]
+
+
+def _qa_cards(items: Sequence[Dict[str, str]]) -> str:
+    return "".join(
+        f"""
+        <div class="qa-card qa-{_e(item.get("status", "warning"))}">
+          <span>{_e(item.get("status", "warning"))}</span>
+          <strong>{_e(item.get("label", "QA"))}</strong>
+          <p>{_e(item.get("detail", ""))}</p>
+        </div>
+        """
+        for item in items
+    )
+
+
+def _hero_image(review_dir: Path, listing_images: Sequence[Path], cover_mockups: Sequence[Path], page_mockups: Sequence[Path], asset_map: Dict[str, Path]) -> str:
+    path = _first_path(listing_images) or _first_path(cover_mockups) or _first_path(page_mockups)
+    if not path:
+        return '<div class="hero-frame"><p class="muted">No hero image available.</p></div>'
+    src = _href(review_dir, path, asset_map)
+    return f"""
+      <div class="hero-frame">
+        {_image_button(review_dir, path, "Hero carousel image", asset_map)}
+        <div class="caption">Hero Carousel Image · click to inspect</div>
+      </div>
+    """
+
+
+def _carousel_review_html(review_dir: Path, listing_images: Sequence[Path], listing_thumbnail_images: Sequence[Path], asset_map: Dict[str, Path]) -> str:
+    return f"""
+      <div class="rail large ordered-gallery">{_gallery_cards(review_dir, listing_images, "Carousel slide", asset_map)}</div>
+      <div class="split-review">
+        <div>
+          <h3>Thumbnail Strip</h3>
+          <div class="thumbnail-grid">{_gallery_cards(review_dir, listing_thumbnail_images, "Mobile thumbnail", asset_map)}</div>
+        </div>
+        <div>
+          <h3>Mobile Simulation</h3>
+          <div class="phone-row">{_phone_frames(review_dir, listing_thumbnail_images[:4], asset_map)}</div>
+        </div>
+      </div>
+      <div class="compare-grid">{_cohesion_pairs(review_dir, listing_images, listing_thumbnail_images, asset_map)}</div>
+    """
+
+
+def _product_review_html(
+    review_dir: Path,
+    page_groups: Sequence[tuple[str, List[Path]]],
+    section_dividers: Sequence[Path],
+    page_previews: Sequence[Path],
+    cover_images: Sequence[Path],
+    cover_mockups: Sequence[Path],
+    spreads: Sequence[Path],
+    asset_map: Dict[str, Path],
+) -> str:
+    group_html = "".join(
+        f"""
+        <div class="page-group">
+          <h3>{_e(category.title())}</h3>
+          <div class="mini-grid">{_gallery_cards(review_dir, paths, category.title(), asset_map)}</div>
+        </div>
+        """
+        for category, paths in page_groups
+    )
+    return f"""
+      <div class="rail large">{_gallery_cards(review_dir, spreads, "Rendered spread", asset_map)}</div>
+      <div class="split-review">
+        <div class="side-stack">
+          <h3>Cover System</h3>
+          <div class="rail">{_gallery_cards(review_dir, cover_mockups or cover_images, "Cover", asset_map)}</div>
+        </div>
+        <div class="side-stack">
+          <h3>Section Dividers</h3>
+          <div class="mini-grid">{_gallery_cards(review_dir, section_dividers, "Divider", asset_map)}</div>
+        </div>
+      </div>
+      {group_html}
+      <div class="page-group">
+        <h3>Full Page Scan</h3>
+        <div class="rail">{_gallery_cards(review_dir, page_previews, "Full page", asset_map)}</div>
+      </div>
+    """
+
+
+def _mockup_review_html(
+    review_dir: Path,
+    device_mockups: Sequence[Path],
+    page_mockups: Sequence[Path],
+    spreads: Sequence[Path],
+    detail_mockups: Sequence[Path],
+    bundle_overviews: Sequence[Path],
+    asset_map: Dict[str, Path],
+) -> str:
+    return f"""
+      <div class="rail large">{_gallery_cards(review_dir, device_mockups, "Tablet mockup", asset_map)}</div>
+      <div class="split-review">
+        <div>
+          <h3>Paper Stack Mockups</h3>
+          <div class="rail">{_gallery_cards(review_dir, page_mockups, "Paper stack", asset_map)}</div>
+        </div>
+        <div>
+          <h3>Detail Crops</h3>
+          <div class="rail">{_gallery_cards(review_dir, detail_mockups, "Detail crop", asset_map)}</div>
+        </div>
+      </div>
+      <div class="split-review">
+        <div>
+          <h3>Spread Mockups</h3>
+          <div class="rail">{_gallery_cards(review_dir, spreads, "Spread mockup", asset_map)}</div>
+        </div>
+        <div>
+          <h3>Lifestyle Compositions</h3>
+          <div class="rail">{_gallery_cards(review_dir, bundle_overviews, "Composition", asset_map)}</div>
+        </div>
+      </div>
+    """
+
+
+def _copy_review_html(listing_copy: dict) -> str:
+    title = str(listing_copy.get("title") or "Listing title not generated")
+    description = str(listing_copy.get("description") or "Run the copywriting engine to generate listing description copy.")
+    tags = [str(tag) for tag in listing_copy.get("tags", []) if str(tag).strip()]
+    carousel_lines = [str(line) for line in listing_copy.get("carousel_lines", []) if str(line).strip()]
+    subtitles = [str(line) for line in listing_copy.get("product_subtitles", []) if str(line).strip()]
+    positioning = listing_copy.get("collection_positioning", {})
+    if not isinstance(positioning, dict):
+        positioning = {}
+    return f"""
+      <div class="copy-grid">
+        <div class="copy-panel">
+          <div class="listing-title">{_e(title)}</div>
+          <div class="copy-body">{_e(description)}</div>
+        </div>
+        <div class="copy-panel">
+          <h3>Tags</h3>
+          <div class="tag-list">{''.join(f'<span>{_e(tag)}</span>' for tag in tags)}</div>
+        </div>
+        <div class="copy-panel">
+          <h3>Carousel Supporting Copy</h3>
+          <div class="copy-lines">{''.join(f'<span>{_e(line)}</span>' for line in carousel_lines)}</div>
+        </div>
+        <div class="copy-panel">
+          <h3>Collection Positioning</h3>
+          <ul class="positioning-list">
+            <li><strong>Collection</strong><br>{_e(positioning.get("collection_name", ""))}</li>
+            <li><strong>Category</strong><br>{_e(positioning.get("category_name", ""))}</li>
+            <li><strong>Line</strong><br>{_e(positioning.get("line_name", ""))}</li>
+            <li><strong>Subtitles</strong><br>{_e(" / ".join(subtitles))}</li>
+          </ul>
+        </div>
       </div>
 """
 
@@ -854,15 +1217,47 @@ def _single_feature_image(review_dir: Path, paths: Sequence[Path]) -> str:
     return f'<a href="{_href(review_dir, path)}"><img src="{_href(review_dir, path)}" alt="{_e(path.name)}"></a>'
 
 
-def _gallery_cards(review_dir: Path, paths: Sequence[Path], label: str) -> str:
+def _gallery_cards(review_dir: Path, paths: Sequence[Path], label: str, asset_map: Dict[str, Path] | None = None) -> str:
     return "".join(
         f"""
         <figure class="gallery-card">
-          <a href="{_href(review_dir, path)}"><img src="{_href(review_dir, path)}" alt="{_e(path.name)}"></a>
+          {_image_button(review_dir, path, f"{label} {index:02d} · {_display_name(path.stem)}", asset_map)}
           <figcaption>{_e(label)} {index:02d} · {_e(_display_name(path.stem))}</figcaption>
         </figure>
         """
         for index, path in enumerate(paths, start=1)
+    )
+
+
+def _image_button(review_dir: Path, path: Path, title: str, asset_map: Dict[str, Path] | None = None) -> str:
+    src = _href(review_dir, path, asset_map)
+    return f"""
+      <button type="button" class="image-button" data-lightbox-src="{src}" data-lightbox-title="{_e(title)}">
+        <img src="{src}" alt="{_e(title)}" loading="lazy">
+      </button>
+    """
+
+
+def _phone_frames(review_dir: Path, paths: Sequence[Path], asset_map: Dict[str, Path]) -> str:
+    return "".join(
+        f'<div class="phone-frame">{_image_button(review_dir, path, "Mobile thumbnail simulation", asset_map)}</div>'
+        for path in paths
+    )
+
+
+def _cohesion_pairs(review_dir: Path, carousel: Sequence[Path], thumbnails: Sequence[Path], asset_map: Dict[str, Path]) -> str:
+    pairs = list(zip(carousel[:4], thumbnails[:4]))
+    return "".join(
+        f"""
+        <div class="compare-card">
+          <div class="compare-labels"><span>Full Carousel</span><span>Mobile Crop</span></div>
+          <div class="compare-pair">
+            {_image_button(review_dir, large, "Full carousel slide", asset_map)}
+            {_image_button(review_dir, thumb, "Mobile thumbnail crop", asset_map)}
+          </div>
+        </div>
+        """
+        for large, thumb in pairs
     )
 
 
@@ -897,6 +1292,46 @@ def _approval_cards(product_data: dict, page_count: int, mockup_count: int, cove
         ("Cover System", f"{cover_count} variants"),
     ]
     return "".join(f'<div class="approval-card"><strong>{_e(title)}</strong><span>{_e(body)}</span></div>' for title, body in cards)
+
+
+def _page_category_groups(product_data: dict, page_previews: Sequence[Path]) -> List[tuple[str, List[Path]]]:
+    inventory = product_data.get("inventory", {})
+    categories = inventory.get("categories", {}) if isinstance(inventory, dict) else {}
+    by_id = {_page_id_from_path(path): path for path in page_previews}
+    groups: List[tuple[str, List[Path]]] = []
+    if isinstance(categories, dict):
+        for category, page_ids in categories.items():
+            paths = [by_id[str(page_id)] for page_id in page_ids if str(page_id) in by_id]
+            if paths:
+                groups.append((str(category), paths))
+    grouped_paths = {path for _, paths in groups for path in paths}
+    remaining = [path for path in page_previews if path not in grouped_paths]
+    if remaining:
+        groups.append(("additional pages", remaining))
+    return groups
+
+
+def _section_divider_paths(product_data: dict, page_previews: Sequence[Path]) -> List[Path]:
+    inventory = product_data.get("inventory", {})
+    pages = inventory.get("pages", []) if isinstance(inventory, dict) else []
+    divider_ids = {
+        str(page.get("id"))
+        for page in pages
+        if isinstance(page, dict) and str(page.get("page_type", "")) == "section_divider"
+    }
+    by_id = {_page_id_from_path(path): path for path in page_previews}
+    return [by_id[page_id] for page_id in divider_ids if page_id in by_id]
+
+
+def _page_id_from_path(path: Path) -> str:
+    stem = path.stem
+    if "_" in stem and stem.split("_", 1)[0].isdigit():
+        return stem.split("_", 1)[1]
+    return stem
+
+
+def _first_path(paths: Sequence[Path]) -> Path | None:
+    return paths[0] if paths else None
 
 
 def _export_cards(
@@ -950,8 +1385,9 @@ def _file_links(review_dir: Path, paths: Sequence[Path]) -> str:
     return "".join(f'<li><a class="path" href="{_href(review_dir, path)}">{_e(str(path))}</a></li>' for path in paths)
 
 
-def _href(base: Path, target: Path) -> str:
-    return html.escape(os.path.relpath(target, base).replace(os.sep, "/"), quote=True)
+def _href(base: Path, target: Path, asset_map: Dict[str, Path] | None = None) -> str:
+    display_target = asset_map.get(str(target.resolve()), target) if asset_map else target
+    return html.escape(os.path.relpath(display_target, base).replace(os.sep, "/"), quote=True)
 
 
 def _e(value: object) -> str:
@@ -960,6 +1396,38 @@ def _e(value: object) -> str:
 
 def _read_optional(path: Path) -> str:
     return path.read_text(encoding="utf-8").strip() if path.exists() else ""
+
+
+def _listing_copy_data(bundle_dir: Path) -> dict:
+    copy_dir = Path("output/copy")
+    legacy_dir = bundle_dir / "listing"
+    metadata_path = copy_dir / "metadata.json"
+    if not metadata_path.exists():
+        metadata_path = legacy_dir / "metadata.json"
+    metadata = json.loads(metadata_path.read_text(encoding="utf-8")) if metadata_path.exists() else {}
+
+    title = _read_optional(copy_dir / "title.txt") or _read_optional(legacy_dir / "title.txt") or str(metadata.get("title", ""))
+    description = _read_optional(copy_dir / "description.txt") or _read_optional(legacy_dir / "description.txt") or str(metadata.get("description", ""))
+    tags = _read_tags(copy_dir / "tags.json", copy_dir / "tags.txt") or _read_tags(legacy_dir / "tags.json", legacy_dir / "tags.txt") or [str(tag) for tag in metadata.get("tags", [])]
+    carousel_copy = metadata.get("carousel_supporting_copy", {})
+    carousel_path = copy_dir / "carousel_copy.json"
+    if carousel_path.exists():
+        carousel_copy = json.loads(carousel_path.read_text(encoding="utf-8"))
+    carousel_lines: List[str] = []
+    if isinstance(carousel_copy, dict):
+        for item in carousel_copy.get("slide_lines", []):
+            if isinstance(item, dict) and item.get("copy"):
+                carousel_lines.append(str(item["copy"]))
+        if not carousel_lines:
+            carousel_lines.extend(str(item) for item in carousel_copy.get("micro_lines", []))
+    return {
+        "title": title,
+        "description": description,
+        "tags": tags,
+        "carousel_lines": carousel_lines,
+        "product_subtitles": metadata.get("product_subtitles", []),
+        "collection_positioning": metadata.get("collection_positioning", {}),
+    }
 
 
 def _read_tags(json_path: Path, text_path: Path) -> List[str]:

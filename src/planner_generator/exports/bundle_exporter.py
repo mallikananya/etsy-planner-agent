@@ -161,7 +161,16 @@ def _build_manifest(
             },
             "etsy_listing_image_generation": {
                 "purpose": "Generate marketing graphics for Etsy conversion.",
-                "outputs": ["thumbnail", "features", "interior_pages", "transformation", "cover_options", "whats_included", "device_compatibility"],
+                "outputs": [
+                    "hero",
+                    "interior_preview",
+                    "features",
+                    "whats_included",
+                    "transformation_lifestyle",
+                    "cover_options",
+                    "device_print_compatibility",
+                    "detail_closeup",
+                ],
                 "optimization_goal": "aspiration_and_conversion",
             },
         },

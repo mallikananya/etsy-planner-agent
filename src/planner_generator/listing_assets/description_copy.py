@@ -51,7 +51,7 @@ def generate_listing_description(
     voice = _select_voice(context)
     sections = [
         _opening_hook(context, voice),
-        _transformation_benefits(context, voice),
+        _lifestyle_benefits(context, voice),
         _helps_you(context, voice),
         _key_features(context),
         _what_you_receive(context),
@@ -129,43 +129,45 @@ class _DescriptionContext:
 
 def _opening_hook(context: _DescriptionContext, voice: _Voice) -> DescriptionSection:
     lines = [
-        f"Create a planning ritual that feels like the life you are becoming.",
+        "Create a planning ritual that feels like the life you are becoming.",
         (
-            f"This {context.product_name} is designed for {voice.identity}: the version of you who wants "
-            f"{voice.emotional_desire}, not another overwhelming stack of tasks."
+            f"{context.product_name} is made for {voice.identity}: the version of you who wants "
+            f"{voice.emotional_desire}."
         ),
         (
-            "It is calm, elevated, and practical enough to use on an ordinary Tuesday, with pages that help you "
-            "romanticize your routines while still giving your week real structure."
+            "It brings together calm structure, soft routines, and practical planning pages so your week feels "
+            "held instead of crowded, without turning every day into a performance."
         ),
     ]
-    return DescriptionSection("emotional_opening_hook", "Emotional Opening Hook", lines)
+    return DescriptionSection("emotional_hook", "A softer way to plan", lines)
 
 
-def _transformation_benefits(context: _DescriptionContext, voice: _Voice) -> DescriptionSection:
+def _lifestyle_benefits(context: _DescriptionContext, voice: _Voice) -> DescriptionSection:
     keyword_phrase = _natural_keyword_phrase(context)
     lines = [
         (
-            f"Instead of planning from pressure, this {keyword_phrase} helps you move through your days with "
-            f"{voice.daily_shift}."
+            f"Instead of planning from pressure, this {keyword_phrase} supports {voice.daily_shift}."
         ),
         (
-            "Use it to gather the loose pieces of your life, choose what matters first, create softer routines, "
-            "and return to your goals without the heavy feeling of starting over."
+            "Use it for weekly resets, morning and evening check-ins, wellness notes, meals, movement, habits, "
+            "reflection, and the small pieces of life admin that feel lighter once they have a place to land."
         ),
-        _differentiation_sentence(context),
+        (
+            "The result is an intentional planning rhythm that feels elegant on your desk, simple to print, "
+            "and easy to return to when life gets full."
+        ),
     ]
-    return DescriptionSection("transformation_benefits", "Transformation Benefits", lines)
+    return DescriptionSection("lifestyle_benefits", "Lifestyle Benefits", lines)
 
 
 def _helps_you(context: _DescriptionContext, voice: _Voice) -> DescriptionSection:
     benefits = _unique(
         voice.signature_benefits
         + [
-            "Create intentional routines that feel supportive",
-            "Reduce overwhelm with gentle structure",
+            "Create routines that feel supportive instead of strict",
+            "Reduce mental clutter with clear planning spaces",
             "Stay aligned with your goals without chasing perfection",
-            "Romanticize your daily planning ritual",
+            "Make your daily reset feel grounded and beautiful",
             "Build calm consistency around the life you want",
         ]
     )[:7]
@@ -177,9 +179,9 @@ def _key_features(context: _DescriptionContext) -> DescriptionSection:
         _feature_lines_for_niche(context)
         + [
             f"{context.page_count} planner pages" if context.page_count else "Planner page collection",
-            "Daily, weekly, routine, reflection, wellness, and notes-style layouts",
+            "Daily, weekly, routine, reflection, wellness, and notes layouts",
             "Goal planning, habit tracking, self-care, and reset pages",
-            "Complete printable PDFs plus individual page PDFs",
+            "Complete PDF planner files plus individual page PDFs",
             "US Letter and A4 formats",
             "PDF files that can be imported into common note-taking apps",
             "Instant digital download through Etsy after purchase",
@@ -195,7 +197,7 @@ def _what_you_receive(context: _DescriptionContext) -> DescriptionSection:
         "Individual page PDFs for flexible printing",
         "A customer ZIP with the primary planner files",
         "Reusable pages you can print again for personal use",
-        "A polished neutral design system with warm editorial styling",
+        "A polished neutral design system with warm, editorial styling",
     ]
     if context.page_count:
         included.insert(0, f"{context.page_count} total planner pages")
@@ -208,7 +210,7 @@ def _important_notes(context: _DescriptionContext) -> DescriptionSection:
     lines = [
         "- This is a digital product. No physical planner will be shipped.",
         "- Files are delivered through Etsy after purchase.",
-        "- This is a printable PDF planner, not an editable Canva, Word, or spreadsheet template.",
+        "- This is a PDF planner, not an editable Canva, Word, or spreadsheet template.",
         "- PDF files may be imported into common annotation apps for digital handwriting; app compatibility can vary by device.",
         "- Print colors may vary slightly depending on your monitor, printer, paper, and ink settings.",
         "- For best results, print at actual size / 100% scale unless your printer requires fit-to-page.",
@@ -236,7 +238,7 @@ def _select_voice(context: _DescriptionContext) -> _Voice:
         return _Voice(
             name="soft_wellness_recovery",
             identity="the woman rebuilding her routines with tenderness, clarity, and self-trust",
-            emotional_desire="more calm, more energy awareness, and habits that support her instead of punish her",
+            emotional_desire="more calm, more energy awareness, and habits that feel supportive rather than punishing",
             daily_shift="gentle momentum, emotional steadiness, and permission to plan at a human pace",
             signature_benefits=[
                 "Protect your energy with softer check-ins",
@@ -316,7 +318,7 @@ def _natural_keyword_phrase(context: _DescriptionContext) -> str:
         if "planner" not in phrase.lower():
             phrase = f"{phrase} planner"
         return phrase
-    return "printable planner"
+    return "wellness planner"
 
 
 def _seo_keywords(context: _DescriptionContext) -> List[str]:
@@ -324,13 +326,6 @@ def _seo_keywords(context: _DescriptionContext) -> List[str]:
         return _clean_keywords([str(tag) for tag in context.bundle.metadata.get("tags", [])])[:5]
     values = context.market_brief.primary_keywords + context.market_brief.long_tail_keywords + context.market_brief.seo_tags
     return _clean_keywords(values)[:8]
-
-
-def _differentiation_sentence(context: _DescriptionContext) -> str:
-    if context.differentiation and context.differentiation.differentiators:
-        clean = context.differentiation.differentiators[0].rstrip(".")
-        return f"What makes it feel different: {clean.lower()}."
-    return "The result is a planning system that feels abundant and premium without becoming cluttered, cold, or difficult to use."
 
 
 def _render_section(section: DescriptionSection, show_heading: bool) -> str:
@@ -342,6 +337,8 @@ def _render_section(section: DescriptionSection, show_heading: bool) -> str:
 
 def _clean_product_name(value: str, fallback: str) -> str:
     source = fallback if "," in value or " pdf" in value.lower() or " instant download" in value.lower() else value
+    if "wellness" in source.lower() and "starter" in source.lower():
+        return "Soft Life Wellness Planner"
     replacements = [
         " printable",
         " planner pdf",

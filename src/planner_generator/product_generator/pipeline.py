@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import shutil
-import subprocess
 from contextlib import suppress
 from dataclasses import dataclass
 from pathlib import Path
@@ -13,6 +12,7 @@ from planner_generator.layout_engine.page_sizes import get_page_size
 from planner_generator.product_generator.design_system import soft_life_system
 from planner_generator.product_generator.inventory import ProductInventory, build_soft_life_inventory
 from planner_generator.rendering.page_renderer import render_page_to_pdf, render_pages_to_pdf
+from planner_generator.rendering.pdf_to_png import pdf_to_png
 from planner_generator.rendering.pdf_canvas import PdfCanvas
 from planner_generator.rendering.png_canvas import PngCanvas, hex_to_rgb
 from planner_generator.review import Bitmap, read_png, resize_to_fit, write_png
@@ -313,18 +313,7 @@ def _write_products_manifest(
 
 
 def _pdf_to_png(pdf_path: Path, png_path: Path, width: int, height: int) -> bool:
-    if not shutil.which("sips"):
-        return False
-    try:
-        subprocess.run(
-            ["sips", "-s", "format", "png", "-z", str(height), str(width), str(pdf_path), "--out", str(png_path)],
-            check=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-        )
-    except (OSError, subprocess.CalledProcessError):
-        return False
-    return png_path.exists()
+    return pdf_to_png(pdf_path, png_path, width=width, height=height)
 
 
 def _fallback_cover(path: Path, background: str, accent: str, line_one: str, line_two: str) -> None:

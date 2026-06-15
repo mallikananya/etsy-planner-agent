@@ -27,9 +27,14 @@ def test_listing_metadata_respects_etsy_constraints():
     assert metadata["etsy_constraints"]["tag_count"] == len(metadata["tags"])
     assert len(metadata["description"]) <= ETSY_DESCRIPTION_MAX_LENGTH
     assert metadata["description"].startswith("Create a planning ritual")
-    assert metadata["description_sections"][0]["key"] == "emotional_opening_hook"
+    assert metadata["description_sections"][0]["key"] == "emotional_hook"
     assert metadata["description_sections"][-1]["key"] == "important_notes"
-    assert metadata["description_copy_engine"]["name"] == "etsy_luxury_sales_page"
+    assert metadata["description_copy_engine"]["name"] == "premium_lifestyle_copywriting_engine"
+    assert metadata["description_copy_engine"]["qa"]["status"] == "pass"
+    assert metadata["title"] == "Soft Life Wellness Planner | Printable PDF for Calm Routines"
+    assert "," not in metadata["title"]
+    assert "carousel_supporting_copy" in metadata
+    assert metadata["collection_name"] == "Soft Life Series"
 
 
 def test_listing_description_uses_benefit_first_sales_page_structure():
@@ -54,7 +59,7 @@ def test_listing_description_uses_benefit_first_sales_page_structure():
     metadata = generate_listing_metadata(bundle, theme, brief, concept, differentiation)
     description = metadata["description"]
 
-    assert description.index("Transformation Benefits") < description.index("This planner helps you")
+    assert description.index("Lifestyle Benefits") < description.index("This planner helps you")
     assert description.index("This planner helps you") < description.index("Key Features")
     assert description.index("Key Features") < description.index("What You Receive")
     assert description.index("What You Receive") < description.index("Important Notes")
@@ -63,3 +68,4 @@ def test_listing_description_uses_benefit_first_sales_page_structure():
     assert "Create calm boundaries between ambition, rest, and everyday life" in description
     assert metadata["description_copy_engine"]["brand_voice"] == "polished_work_reset"
     assert "corporate girl reset" in metadata["description_copy_engine"]["seo_keywords_used"]
+    assert metadata["collection_positioning"]["collection_name"] == "Calm Systems Collection"

@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-import subprocess
 from contextlib import suppress
 from pathlib import Path
 from typing import Callable, List, Sequence
 
 from planner_generator.brand_system import atelier_system
 from planner_generator.planner_specs.models import PageSpec
+from planner_generator.rendering.pdf_to_png import pdf_to_png
 from planner_generator.rendering.pdf_canvas import PdfCanvas
 from planner_generator.rendering.png_canvas import PngCanvas, RGB, hex_to_rgb
 from planner_generator.theme_engine.models import Theme
@@ -39,24 +39,9 @@ def _write_pdf_png(path: Path, draw: Callable[[PdfCanvas], None], fallback: str)
         canvas = PdfCanvas(PDF_WIDTH, PDF_HEIGHT)
         draw(canvas)
         canvas.write(temp_pdf)
-        subprocess.run(
-            [
-                "sips",
-                "-s",
-                "format",
-                "png",
-                "-z",
-                str(PREVIEW_HEIGHT),
-                str(PREVIEW_WIDTH),
-                str(temp_pdf),
-                "--out",
-                str(path),
-            ],
-            check=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-        )
-    except (OSError, subprocess.CalledProcessError):
+        if not pdf_to_png(temp_pdf, path, width=PREVIEW_WIDTH, height=PREVIEW_HEIGHT):
+            _fallback_png(path, fallback)
+    except OSError:
         _fallback_png(path, fallback)
     finally:
         with suppress(FileNotFoundError):
