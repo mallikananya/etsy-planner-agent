@@ -24,6 +24,52 @@ THUMBNAIL_WIDTH = 500
 THUMBNAIL_HEIGHT = 400
 
 
+class PngSlideCanvas:
+    """PDF-coordinate-compatible canvas that writes carousel slides directly to PNG."""
+
+    def __init__(self, width: int, height: int, background: str) -> None:
+        self.width = width
+        self.height = height
+        self._canvas = PngCanvas(width, height, _rgb(background))
+
+    def rect(
+        self,
+        x: float,
+        y: float,
+        width: float,
+        height: float,
+        stroke: str | None = None,
+        fill: str | None = None,
+        stroke_width: float = 1.0,
+    ) -> None:
+        top = self.height - y - height
+        if fill:
+            self._canvas.rect(x, top, width, height, _rgb(fill))
+        if stroke:
+            color = _rgb(stroke)
+            line_width = max(1, int(round(stroke_width)))
+            self._canvas.rect(x, top, width, line_width, color)
+            self._canvas.rect(x, top + height - line_width, width, line_width, color)
+            self._canvas.rect(x, top, line_width, height, color)
+            self._canvas.rect(x + width - line_width, top, line_width, height, color)
+
+    def line(self, x1: float, y1: float, x2: float, y2: float, color: str, width: float = 1.0) -> None:
+        self._canvas.line(x1, self.height - y1, x2, self.height - y2, _rgb(color), max(1, int(round(width))))
+
+    def text(self, value: str, x: float, y: float, size: float, color: str, font: str = "sans") -> None:
+        rendered_size = max(1, int(round(size * 0.65)))
+        self._canvas.text(value, x, self.height - y - size, rendered_size, _rgb(color))
+
+    def image(self, path: str | Path, x: float, y: float, width: float, height: float) -> None:
+        image = read_png(Path(path))
+        thumb = resize_to_fit(image, max(1, int(round(width))), max(1, int(round(height))), (255, 255, 255))
+        bitmap = Bitmap(self.width, self.height, self._canvas._pixels)
+        bitmap.paste(thumb, int(round(x)), int(round(self.height - y - height)))
+
+    def write(self, path: Path) -> None:
+        self._canvas.write(path)
+
+
 @dataclass(frozen=True)
 class SourceAsset:
     path: Path
@@ -264,12 +310,15 @@ def _load_carousel_assets(output_dir: Path) -> CarouselAssets:
 
 
 def _hero(canvas: PdfCanvas, slide: CarouselSlide, context: _CampaignContext, assets: CarouselAssets, p: Palette) -> None:
+    line_one, line_two = _hero_title_lines(context.product_name)
+    tagline = _hero_tagline(context)
     _campaign_background(canvas, p, accent="#D8C5B9", warm=True)
     _vertical_band(canvas, 0, "#C9B9A9", 0.16)
-    _text_block(canvas, slide, "Soft Life", 136, 190, 112, p.ink, "serif", max_width=620)
-    _text_block(canvas, slide, "Wellness Planner", 142, 306, 62, p.ink, "serif", max_width=650)
-    _text_block(canvas, slide, "Digital + printable planning pages for calm routines, gentle structure, and intentional days.", 148, 402, 30, p.umber, "serif", max_width=620, leading=38)
-    _badge(canvas, slide, "52 PAGE SYSTEM", 150, 544, 250)
+    _text_block(canvas, slide, line_one, 136, 190, 96 if line_two else 84, p.ink, "serif", max_width=660)
+    if line_two:
+        _text_block(canvas, slide, line_two, 142, 306, 56, p.ink, "serif", max_width=650)
+    _text_block(canvas, slide, tagline, 148, 402, 30, p.umber, "serif", max_width=620, leading=38)
+    _badge(canvas, slide, f"{context.page_count or 52} PAGE SYSTEM", 150, 544, 250)
     _badge(canvas, slide, "GOODNOTES READY", 430, 544, 290)
     _badge(canvas, slide, "INSTANT DOWNLOAD", 150, 618, 318)
     _place_image(canvas, slide, assets.tablets[1 if len(assets.tablets) > 1 else 0], 820, 180, 920, 690, shadow=34)
@@ -277,6 +326,25 @@ def _hero(canvas: PdfCanvas, slide: CarouselSlide, context: _CampaignContext, as
     _place_image(canvas, slide, assets.paper_stacks[2 if len(assets.paper_stacks) > 2 else 0], 1472, 720, 360, 450, shadow=18)
     _caption(canvas, slide, "Planner pages shown are real generated previews", 152, 1416, 22)
     _brand(canvas, slide, 152, 96)
+
+
+def _hero_title_lines(product_name: str) -> tuple[str, str]:
+    words = product_name.split()
+    if len(words) <= 2:
+        return product_name, ""
+    if len(words) == 3:
+        return words[0], " ".join(words[1:])
+    split_at = max(2, min(len(words) - 2, len(words) // 2))
+    return " ".join(words[:split_at]), " ".join(words[split_at:])
+
+
+def _hero_tagline(context: _CampaignContext) -> str:
+    if context.product_concept and context.product_concept.promise:
+        return context.product_concept.promise
+    titles = ", ".join(context.page_titles[:3])
+    if titles:
+        return f"Digital + printable planning pages for {titles.lower()} and intentional routines."
+    return "Digital + printable planning pages for calm routines, gentle structure, and intentional days."
 
 
 def _interior_preview(canvas: PdfCanvas, slide: CarouselSlide, context: _CampaignContext, assets: CarouselAssets, p: Palette) -> None:
@@ -508,16 +576,25 @@ def _brand(canvas: PdfCanvas, slide: CarouselSlide, x: float, y: float) -> None:
 def _write_slide_png(path: Path, slide: CarouselSlide, palette: Palette) -> None:
     temp_pdf = path.with_suffix(".preview.pdf")
     try:
+        canvas = PngSlideCanvas(LISTING_WIDTH, LISTING_HEIGHT, palette.oat)
+        slide.draw(canvas, slide)
+        canvas.write(path)
+        return
+    except OSError:
+        pass
+
+    try:
         canvas = PdfCanvas(LISTING_WIDTH, LISTING_HEIGHT)
         slide.draw(canvas, slide)
         canvas.write(temp_pdf)
-        if not pdf_to_png(temp_pdf, path, width=LISTING_WIDTH, height=LISTING_HEIGHT):
-            _fallback_png(path, palette, slide.assets[:1])
+        if pdf_to_png(temp_pdf, path, width=LISTING_WIDTH, height=LISTING_HEIGHT):
+            return
     except OSError:
-        _fallback_png(path, palette, slide.assets[:1])
+        pass
     finally:
         with suppress(FileNotFoundError):
             temp_pdf.unlink()
+    _fallback_png(path, palette, slide.assets[:1])
 
 
 def _write_thumbnail(source: Path, output_path: Path) -> None:

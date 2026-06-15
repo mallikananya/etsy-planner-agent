@@ -5,8 +5,6 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List, Tuple
 
-from planner_generator.review import read_png
-
 
 def _escape_pdf_text(value: str) -> str:
     return value.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
@@ -96,6 +94,8 @@ class PdfCanvas:
         self._commands.append(f"BT /{font_ref} {size:.2f} Tf {x:.2f} {y:.2f} Td ({escaped}) Tj ET")
 
     def image(self, path: str | Path, x: float, y: float, width: float, height: float) -> None:
+        from planner_generator.review import read_png
+
         image = read_png(Path(path))
         name = f"Im{len(self._images) + 1}"
         self._images.append((name, image.width, image.height, zlib.compress(bytes(image.pixels), level=6)))

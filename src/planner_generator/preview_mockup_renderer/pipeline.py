@@ -477,12 +477,26 @@ def _resize_layer_to_fit(image: Bitmap, max_width: int, max_height: int) -> Laye
     height = max(1, int(round(image.height * scale)))
     pixels = bytearray(width * height * 3)
     for y in range(height):
-        source_y = min(image.height - 1, int(y / scale))
+        source_y = min(image.height - 1, max(0.0, (y + 0.5) / scale - 0.5))
+        y0 = int(math.floor(source_y))
+        y1 = min(image.height - 1, y0 + 1)
+        wy = source_y - y0
         for x in range(width):
-            source_x = min(image.width - 1, int(x / scale))
-            source_offset = (source_y * image.width + source_x) * 3
+            source_x = min(image.width - 1, max(0.0, (x + 0.5) / scale - 0.5))
+            x0 = int(math.floor(source_x))
+            x1 = min(image.width - 1, x0 + 1)
+            wx = source_x - x0
             target_offset = (y * width + x) * 3
-            pixels[target_offset : target_offset + 3] = image.pixels[source_offset : source_offset + 3]
+            offsets = [
+                (y0 * image.width + x0) * 3,
+                (y0 * image.width + x1) * 3,
+                (y1 * image.width + x0) * 3,
+                (y1 * image.width + x1) * 3,
+            ]
+            for channel in range(3):
+                top = image.pixels[offsets[0] + channel] * (1 - wx) + image.pixels[offsets[1] + channel] * wx
+                bottom = image.pixels[offsets[2] + channel] * (1 - wx) + image.pixels[offsets[3] + channel] * wx
+                pixels[target_offset + channel] = int(round(top * (1 - wy) + bottom * wy))
     return Layer(width, height, pixels, bytearray([255]) * (width * height))
 
 
