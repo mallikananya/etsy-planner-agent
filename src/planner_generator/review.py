@@ -856,6 +856,9 @@ def _review_html(
     .phone-frame img {{ width: 100%; border-radius: 22px; display: block; }}
     .split-review {{ display: grid; grid-template-columns: minmax(0,1fr) minmax(0,0.88fr); gap: 22px; margin-top: 24px; }}
     .side-stack {{ display: grid; gap: 14px; }}
+    .product-cover-strip {{ display: grid; grid-template-columns: minmax(260px, 0.34fr) minmax(0, 1fr); gap: 24px; align-items: start; margin: 0 0 28px; padding: 22px; background: rgba(255,253,248,0.74); border: 1px solid var(--line); box-shadow: 0 14px 34px rgba(69, 52, 38, 0.08); }}
+    .product-cover-strip h3 {{ margin: 0 0 8px; font-size: 30px; }}
+    .product-cover-strip .rail {{ padding-bottom: 10px; grid-auto-columns: minmax(220px, 260px); }}
     .page-group {{ margin-top: 18px; }}
     .page-group h3 {{ font-size: 28px; margin: 26px 0 12px; }}
     .mini-grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; }}
@@ -936,7 +939,7 @@ def _review_html(
       {_product_review_html(review_dir, page_groups, section_dividers, page_previews, cover_images, cover_mockups, spreads, asset_map)}
     </section>
     <section id="mockups">{_section_head("SECTION D", "Mockup Review", "Tablet, paper stack, spread, detail crop, and lifestyle-style compositions presented as buyer-facing proof.")}
-      {_mockup_review_html(review_dir, device_mockups, page_mockups, spreads, detail_mockups, bundle_overviews, asset_map)}
+      {_mockup_review_html(review_dir, cover_images, device_mockups, page_mockups, spreads, detail_mockups, bundle_overviews, asset_map)}
     </section>
     <section id="copy">{_section_head("SECTION E", "Copy Review", "Etsy title, description, tags, carousel marketing copy, and collection naming in one conversion-focused read.")}
       {_copy_review_html(listing_copy)}
@@ -1133,6 +1136,7 @@ def _product_review_html(
 
 def _mockup_review_html(
     review_dir: Path,
+    cover_images: Sequence[Path],
     device_mockups: Sequence[Path],
     page_mockups: Sequence[Path],
     spreads: Sequence[Path],
@@ -1140,7 +1144,21 @@ def _mockup_review_html(
     bundle_overviews: Sequence[Path],
     asset_map: Dict[str, Path],
 ) -> str:
+    product_cover_html = (
+        f"""
+      <div class="product-cover-strip">
+        <div>
+          <h3>Actual Product Covers</h3>
+          <p class="muted">These are the real cover PNGs from the product, shown directly so you can choose what to list as the cover instead of judging only from mockups.</p>
+        </div>
+        <div class="rail">{_gallery_cards(review_dir, cover_images, "Actual cover", asset_map)}</div>
+      </div>
+        """
+        if cover_images
+        else ""
+    )
     return f"""
+      {product_cover_html}
       <div class="rail large">{_gallery_cards(review_dir, device_mockups, "Tablet mockup", asset_map)}</div>
       <div class="split-review">
         <div>
