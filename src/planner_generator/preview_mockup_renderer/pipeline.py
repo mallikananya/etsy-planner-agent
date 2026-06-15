@@ -1,12 +1,15 @@
 from __future__ import annotations
 
+import html
 import json
 import math
 import shutil
+from contextlib import suppress
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import List, Sequence
 
+from planner_generator.rendering.html_to_png import render_html_to_png
 from planner_generator.review import Bitmap, read_png, write_png
 from planner_generator.workflow.context import WorkflowContext
 from planner_generator.workflow.state import file_details, manifest_path, update_manifest
@@ -40,14 +43,6 @@ class MockupAsset:
 class MockupRenderResult:
     manifest_path: Path
     mockup_files: List[Path]
-
-
-@dataclass
-class Layer:
-    width: int
-    height: int
-    pixels: bytearray
-    mask: bytearray
 
 
 def render_mockups(context: WorkflowContext) -> MockupRenderResult:
@@ -195,28 +190,25 @@ def _resolve_cover_paths(product_manifest: Path, product_data: dict) -> List[Pat
 def _render_tablet_mockups(pages: Sequence[SourceImage], output_dir: Path) -> List[MockupAsset]:
     assets: List[MockupAsset] = []
     for index, source in enumerate(_select_evenly(pages, min(8, len(pages))), start=1):
-        page = read_png(source.path)
-        canvas = _premium_background(1800, 1350, (235, 229, 221), (246, 242, 236))
-        _soft_shadow(canvas, 280, 132, 1240, 1030, spread=34, strength=0.18)
-        _rounded_rect(canvas, 255, 102, 1240, 1030, (49, 48, 46), radius=44)
-        _rounded_rect(canvas, 292, 140, 1166, 954, (20, 20, 19), radius=24)
-        layer = _resize_layer_to_fit(page, 720, 930)
-        x = 515
-        y = 153
-        _paste_layer(canvas, layer, x, y)
-        _blend_rect(canvas, 800, 1130, 200, 12, (255, 255, 255), 0.22)
         output_path = output_dir / f"{index:02d}_{source.path.stem}_tablet.png"
-        write_png(canvas, output_path)
-        assets.append(
-            MockupAsset(
-                output_path=output_path,
-                mockup_type="tablet",
-                dimensions=(canvas.width, canvas.height),
-                intended_use="Reusable iPad-style product preview for listing or showroom compositions.",
-                sources=[source.path],
-                placements=[Placement(source.path, (x, y, layer.width, layer.height))],
-            )
-        )
+        placement = Placement(source.path, (514, 172, 772, 1006))
+        body = f"""
+<div class="scene tablet-scene">
+  <section class="tablet-copy">
+    <p>Digital Planner Preview</p>
+    <h1>Plan with intention</h1>
+    <span>Real generated planner page shown inside a premium device frame.</span>
+  </section>
+  <div class="device-wrapper">
+    <div class="device-frame"></div>
+    <div class="device-screen">
+      <img src="{_asset_uri(source.path)}" alt="">
+    </div>
+  </div>
+</div>
+"""
+        _render_html_png(output_path, 1800, 1350, body, _mockup_css(), [source.path])
+        assets.append(MockupAsset(output_path, "tablet", (1800, 1350), "Reusable iPad-style product preview for listing or showroom compositions.", [source.path], [placement]))
     return assets
 
 
@@ -226,28 +218,23 @@ def _render_paper_stack_mockups(pages: Sequence[SourceImage], output_dir: Path) 
     for index, source in enumerate(selected_pages, start=1):
         source_position = pages.index(source)
         neighbors = [pages[(source_position - 1) % len(pages)], source, pages[(source_position + 1) % len(pages)]]
-        canvas = _premium_background(1600, 2000, (242, 236, 228), (251, 248, 243))
+        specs = [("paper-sheet back", 312, 338, -2.0), ("paper-sheet middle", 252, 300, 0.0), ("paper-sheet front", 190, 260, 1.5)]
+        layers = []
         placements: List[Placement] = []
-        specs = [(0.0, 248, 250, 0.14), (0.0, 214, 218, 0.16), (0.0, 180, 184, 0.22)]
-        for stack_source, (angle, x, y, shadow) in zip(neighbors, specs):
-            layer = _resize_layer_to_fit(read_png(stack_source.path), 940, 1217)
-            if angle:
-                layer = _rotate_layer(layer, angle)
-            _soft_shadow(canvas, x + 22, y + 28, layer.width, layer.height, spread=18, strength=shadow)
-            _paste_layer(canvas, layer, x, y)
-            placements.append(Placement(stack_source.path, (x, y, layer.width, layer.height)))
-        output_path = output_dir / f"{index:02d}_{source.path.stem}_paper_stack.png"
-        write_png(canvas, output_path)
-        assets.append(
-            MockupAsset(
-                output_path=output_path,
-                mockup_type="paper_stack",
-                dimensions=(canvas.width, canvas.height),
-                intended_use="Reusable printable-page stack using real planner pages.",
-                sources=[item.path for item in neighbors],
-                placements=placements,
+        for stack_source, (class_name, x, y, rotation) in zip(neighbors, specs):
+            layers.append(
+                f'<div class="{class_name}" style="left:{x}px;top:{y}px;transform:rotate({rotation}deg);background-image:url({_css_url(stack_source.path)})"></div>'
             )
-        )
+            placements.append(Placement(stack_source.path, (x, y, 940, 1217)))
+        output_path = output_dir / f"{index:02d}_{source.path.stem}_paper_stack.png"
+        body = f"""
+<div class="scene stack-scene">
+  <div class="stack-copy"><p>Printable planner pages</p><h1>Layered and ready</h1></div>
+  {"".join(layers)}
+</div>
+"""
+        _render_html_png(output_path, 1600, 2000, body, _mockup_css(), [item.path for item in neighbors])
+        assets.append(MockupAsset(output_path, "paper_stack", (1600, 2000), "Reusable printable-page stack using real planner pages.", [item.path for item in neighbors], placements))
     return assets
 
 
@@ -255,28 +242,26 @@ def _render_spread_mockups(pages: Sequence[SourceImage], output_dir: Path) -> Li
     assets: List[MockupAsset] = []
     pairs = [(pages[index], pages[index + 1]) for index in range(0, len(pages) - 1, 2)]
     for index, (left_source, right_source) in enumerate(_select_evenly(pairs, min(10, len(pairs))), start=1):
-        canvas = _premium_background(2200, 1500, (239, 234, 227), (250, 247, 241))
-        _soft_shadow(canvas, 260, 206, 760, 984, spread=26, strength=0.18)
-        _soft_shadow(canvas, 1180, 206, 760, 984, spread=26, strength=0.18)
-        left = _resize_layer_to_fit(read_png(left_source.path), 760, 984)
-        right = _resize_layer_to_fit(read_png(right_source.path), 760, 984)
-        _paste_layer(canvas, left, 316, 220)
-        _paste_layer(canvas, right, 1124, 220)
-        _blend_rect(canvas, 1078, 220, 46, 984, (151, 137, 122), 0.10)
-        _blend_rect(canvas, 1100, 220, 16, 984, (255, 255, 255), 0.42)
         output_path = output_dir / f"{index:02d}_{left_source.path.stem}_{right_source.path.stem}_spread.png"
-        write_png(canvas, output_path)
+        body = f"""
+<div class="scene spread-scene">
+  <div class="spread-title"><p>Interior spread</p><h1>Actual planner layouts</h1></div>
+  <div class="spread-book">
+    <div class="spread-card"><img src="{_asset_uri(left_source.path)}" alt=""></div>
+    <div class="spine"></div>
+    <div class="spread-card"><img src="{_asset_uri(right_source.path)}" alt=""></div>
+  </div>
+</div>
+"""
+        _render_html_png(output_path, 2200, 1500, body, _mockup_css(), [left_source.path, right_source.path])
         assets.append(
             MockupAsset(
-                output_path=output_path,
-                mockup_type="page_spread",
-                dimensions=(canvas.width, canvas.height),
-                intended_use="Reusable two-page spread preview for interior page sequencing.",
-                sources=[left_source.path, right_source.path],
-                placements=[
-                    Placement(left_source.path, (316, 220, left.width, left.height)),
-                    Placement(right_source.path, (1124, 220, right.width, right.height)),
-                ],
+                output_path,
+                "page_spread",
+                (2200, 1500),
+                "Reusable two-page spread preview for interior page sequencing.",
+                [left_source.path, right_source.path],
+                [Placement(left_source.path, (272, 294, 760, 984)), Placement(right_source.path, (1168, 294, 760, 984))],
             )
         )
     return assets
@@ -285,109 +270,86 @@ def _render_spread_mockups(pages: Sequence[SourceImage], output_dir: Path) -> Li
 def _render_cover_mockups(covers: Sequence[SourceImage], output_dir: Path) -> List[MockupAsset]:
     assets: List[MockupAsset] = []
     for index, source in enumerate(covers, start=1):
-        canvas = _premium_background(1600, 2100, (237, 231, 224), (250, 247, 242))
         back_sources = [covers[(index - 2) % len(covers)], covers[index % len(covers)], source] if len(covers) > 1 else [source, source, source]
+        specs = [(430, 372, -4.0), (348, 326, 2.2), (268, 280, 0.0)]
+        layers = []
         placements: List[Placement] = []
-        for stack_source, (angle, x, y, max_w, max_h) in zip(back_sources, [(0.0, 334, 244, 880, 1139), (0.0, 296, 206, 880, 1139), (0.0, 258, 168, 880, 1139)]):
-            layer = _resize_layer_to_fit(read_png(stack_source.path), max_w, max_h)
-            if angle:
-                layer = _rotate_layer(layer, angle)
-            _soft_shadow(canvas, x + 20, y + 26, layer.width, layer.height, spread=22, strength=0.17)
-            _paste_layer(canvas, layer, x, y)
-            placements.append(Placement(stack_source.path, (x, y, layer.width, layer.height)))
-        output_path = output_dir / f"{index:02d}_{source.path.stem}_cover.png"
-        write_png(canvas, output_path)
-        assets.append(
-            MockupAsset(
-                output_path=output_path,
-                mockup_type="cover",
-                dimensions=(canvas.width, canvas.height),
-                intended_use="Reusable cover preview using real generated cover PNGs.",
-                sources=[item.path for item in back_sources],
-                placements=placements,
+        for stack_source, (x, y, rotation) in zip(back_sources, specs):
+            layers.append(
+                f'<div class="cover-card" style="left:{x}px;top:{y}px;transform:rotate({rotation}deg)"><img src="{_asset_uri(stack_source.path)}" alt=""></div>'
             )
-        )
+            placements.append(Placement(stack_source.path, (x, y, 880, 1139)))
+        output_path = output_dir / f"{index:02d}_{source.path.stem}_cover.png"
+        body = f"""
+<div class="scene cover-scene">
+  <div class="cover-copy"><p>Cover collection</p><h1>Choose the mood</h1></div>
+  {"".join(layers)}
+</div>
+"""
+        _render_html_png(output_path, 1600, 2100, body, _mockup_css(), [item.path for item in back_sources])
+        assets.append(MockupAsset(output_path, "cover", (1600, 2100), "Reusable cover preview using real generated cover PNGs.", [item.path for item in back_sources], placements))
     return assets
 
 
 def _render_detail_mockups(pages: Sequence[SourceImage], output_dir: Path) -> List[MockupAsset]:
     assets: List[MockupAsset] = []
     for index, source in enumerate(_select_evenly(pages, min(8, len(pages))), start=1):
-        page = read_png(source.path)
-        crop = _crop_bitmap(page, int(page.width * 0.08), int(page.height * 0.10), int(page.width * 0.92), int(page.height * 0.58))
-        canvas = _premium_background(1800, 1200, (241, 235, 228), (252, 249, 244))
-        layer = _resize_layer_to_fit(crop, 1280, 760)
-        x = 260
-        y = 220
-        _soft_shadow(canvas, x + 14, y + 24, layer.width, layer.height, spread=28, strength=0.18)
-        _paste_layer(canvas, layer, x, y)
         output_path = output_dir / f"{index:02d}_{source.path.stem}_closeup.png"
-        write_png(canvas, output_path)
-        assets.append(
-            MockupAsset(
-                output_path=output_path,
-                mockup_type="interior_closeup",
-                dimensions=(canvas.width, canvas.height),
-                intended_use="Reusable closeup for showing page typography, prompts, and writing space.",
-                sources=[source.path],
-                placements=[Placement(source.path, (x, y, layer.width, layer.height))],
-            )
-        )
+        body = f"""
+<div class="scene detail-scene">
+  <div class="detail-copy"><p>Design detail</p><h1>Spacious, elegant structure</h1></div>
+  <div class="detail-card"><img src="{_asset_uri(source.path)}" alt=""></div>
+</div>
+"""
+        _render_html_png(output_path, 1800, 1200, body, _mockup_css(), [source.path])
+        assets.append(MockupAsset(output_path, "interior_closeup", (1800, 1200), "Reusable closeup for showing page typography, prompts, and writing space.", [source.path], [Placement(source.path, (260, 260, 1280, 760))]))
     return assets
 
 
 def _render_bundle_overviews(pages: Sequence[SourceImage], covers: Sequence[SourceImage], output_dir: Path) -> List[MockupAsset]:
     assets: List[MockupAsset] = []
     selected = _select_evenly(pages, min(18, len(pages)))
-    canvas = _premium_background(2200, 1600, (238, 232, 224), (250, 247, 241))
+    tiles = []
     placements: List[Placement] = []
     for index, source in enumerate(selected):
         row = index // 6
         col = index % 6
-        x = 190 + col * 300 + (row % 2) * 38
-        y = 180 + row * 380
-        layer = _resize_layer_to_fit(read_png(source.path), 235, 304)
-        if index % 4 in {1, 2}:
-            layer = _rotate_layer(layer, -1.4 if index % 4 == 1 else 1.2)
-        _soft_shadow(canvas, x + 8, y + 12, layer.width, layer.height, spread=10, strength=0.16)
-        _paste_layer(canvas, layer, x, y)
-        placements.append(Placement(source.path, (x, y, layer.width, layer.height)))
-    output_path = output_dir / "bundle_overview_stack.png"
-    write_png(canvas, output_path)
-    assets.append(
-        MockupAsset(
-            output_path=output_path,
-            mockup_type="bundle_overview_stack",
-            dimensions=(canvas.width, canvas.height),
-            intended_use="Reusable overview stack showing the breadth of the real planner page system.",
-            sources=[source.path for source in selected],
-            placements=placements,
+        x = 238 + col * 292
+        y = 306 + row * 356
+        rotation = -1.5 if index % 2 == 0 else 1.2
+        tiles.append(
+            f'<div class="bundle-card" style="grid-column:{col + 1};grid-row:{row + 1};transform:rotate({rotation}deg)"><img src="{_asset_uri(source.path)}" alt=""></div>'
         )
-    )
+        placements.append(Placement(source.path, (x, y, 235, 304)))
+    output_path = output_dir / "bundle_overview_stack.png"
+    body = f"""
+<div class="scene bundle-scene">
+  <div class="bundle-heading"><p>Complete planner system</p><h1>{len(selected)} real page previews</h1></div>
+  <div class="bundle-grid">{"".join(tiles)}</div>
+</div>
+"""
+    _render_html_png(output_path, 2200, 1600, body, _mockup_css(), [source.path for source in selected])
+    assets.append(MockupAsset(output_path, "bundle_overview_stack", (2200, 1600), "Reusable overview stack showing the breadth of the real planner page system.", [source.path for source in selected], placements))
 
     if covers:
         source_pool = [*covers[:3], *_select_evenly(pages, min(9, len(pages)))]
-        canvas = _premium_background(2200, 1500, (240, 234, 227), (252, 249, 244))
+        tiles = []
         placements = []
         for index, source in enumerate(source_pool):
-            x = 226 + index * 134
-            y = 278 + (index % 4) * 38
-            layer = _resize_layer_to_fit(read_png(source.path), 420, 544)
-            _soft_shadow(canvas, x + 20, y + 26, layer.width, layer.height, spread=18, strength=0.15)
-            _paste_layer(canvas, layer, x, y)
-            placements.append(Placement(source.path, (x, y, layer.width, layer.height)))
+            x = 240 + index * 134
+            y = 420 + (index % 4) * 38
+            rotation = -7.5 + index * 1.6
+            tiles.append(f'<div class="fan-card" style="left:{x}px;top:{y}px;transform:rotate({rotation}deg)"><img src="{_asset_uri(source.path)}" alt=""></div>')
+            placements.append(Placement(source.path, (x, y, 420, 544)))
         output_path = output_dir / "cover_and_pages_bundle_stack.png"
-        write_png(canvas, output_path)
-        assets.append(
-            MockupAsset(
-                output_path=output_path,
-                mockup_type="bundle_overview_stack",
-                dimensions=(canvas.width, canvas.height),
-                intended_use="Reusable bundle overview mixing real covers and interior pages.",
-                sources=[source.path for source in source_pool],
-                placements=placements,
-            )
-        )
+        body = f"""
+<div class="scene fan-scene">
+  <div class="bundle-heading"><p>Cover plus pages</p><h1>Everything in one bundle</h1></div>
+  {"".join(tiles)}
+</div>
+"""
+        _render_html_png(output_path, 2200, 1500, body, _mockup_css(), [source.path for source in source_pool])
+        assets.append(MockupAsset(output_path, "bundle_overview_stack", (2200, 1500), "Reusable bundle overview mixing real covers and interior pages.", [source.path for source in source_pool], placements))
     return assets
 
 
@@ -431,11 +393,7 @@ def _qa_summary(assets: Sequence[MockupAsset]) -> dict[str, object]:
         failed = [name for name, passed in asset.qa_checks.items() if not passed]
         if failed:
             failures.append({"output_path": str(asset.output_path), "failed_checks": failed})
-    return {
-        "asset_count": len(assets),
-        "passed": not failures,
-        "failures": failures,
-    }
+    return {"asset_count": len(assets), "passed": not failures, "failures": failures}
 
 
 def _write_contact_sheet(image_paths: Sequence[Path], output_path: Path, title: str, columns: int, thumb_width: int, thumb_height: int) -> Path:
@@ -446,166 +404,136 @@ def _write_contact_sheet(image_paths: Sequence[Path], output_path: Path, title: 
     rows = max(1, math.ceil(len(image_paths) / columns))
     width = margin * 2 + columns * thumb_width + (columns - 1) * gutter
     height = margin * 2 + header_height + rows * (thumb_height + label_height) + (rows - 1) * gutter
-    canvas = _premium_background(width, height, (238, 232, 225), (250, 247, 242))
-    canvas.text(title, margin, 34, 16, (77, 68, 58))
-    for index, path in enumerate(image_paths):
-        image = read_png(path)
-        thumb = _resize_layer_to_fit(image, thumb_width, thumb_height)
-        col = index % columns
-        row = index // columns
-        x = margin + col * (thumb_width + gutter)
-        y = margin + header_height + row * (thumb_height + label_height + gutter)
-        _soft_shadow(canvas, x + 5, y + 7, thumb.width, thumb.height, spread=8, strength=0.12)
-        _paste_layer(canvas, thumb, x, y)
-        canvas.text(f"{index + 1:02d} {_contact_label(path.stem)}", x, y + thumb.height + 12, 7, (112, 101, 90))
-    write_png(canvas, output_path)
+    figures = []
+    for index, path in enumerate(image_paths, start=1):
+        figures.append(
+            f"""
+<figure>
+  <img src="{_asset_uri(path)}" alt="">
+  <figcaption>{index:02d} {_e(_contact_label(path.stem))}</figcaption>
+</figure>
+"""
+        )
+    body = f"""
+<div class="contact-sheet" style="--columns:{columns};--thumb-w:{thumb_width}px;--thumb-h:{thumb_height}px;--margin:{margin}px;--gutter:{gutter}px;">
+  <h1>{_e(title)}</h1>
+  <div class="contact-grid">{"".join(figures)}</div>
+</div>
+"""
+    _render_html_png(output_path, width, height, body, _contact_sheet_css(), image_paths)
     return output_path
 
 
-def _premium_background(width: int, height: int, top: tuple[int, int, int], bottom: tuple[int, int, int]) -> Bitmap:
-    canvas = Bitmap.solid(width, height, top)
-    for y in range(height):
-        t = y / max(1, height - 1)
-        color = tuple(int(round(top[channel] * (1 - t) + bottom[channel] * t)) for channel in range(3))
-        canvas.rect(0, y, width, 1, color)
-    return canvas
+def _render_html_png(output_path: Path, width: int, height: int, body: str, css: str, fallback_sources: Sequence[Path]) -> None:
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    html_path = output_path.with_suffix(".html")
+    html_path.write_text(_html_document(width, height, body, css), encoding="utf-8")
+    rendered = False
+    try:
+        rendered = render_html_to_png(html_path, output_path, width, height)
+    finally:
+        with suppress(FileNotFoundError):
+            html_path.unlink()
+    if not rendered:
+        _write_fallback_png(output_path, width, height, fallback_sources)
 
 
-def _resize_layer_to_fit(image: Bitmap, max_width: int, max_height: int) -> Layer:
-    scale = min(max_width / image.width, max_height / image.height)
-    width = max(1, int(round(image.width * scale)))
-    height = max(1, int(round(image.height * scale)))
-    pixels = bytearray(width * height * 3)
-    for y in range(height):
-        source_y = min(image.height - 1, max(0.0, (y + 0.5) / scale - 0.5))
-        y0 = int(math.floor(source_y))
-        y1 = min(image.height - 1, y0 + 1)
-        wy = source_y - y0
-        for x in range(width):
-            source_x = min(image.width - 1, max(0.0, (x + 0.5) / scale - 0.5))
-            x0 = int(math.floor(source_x))
-            x1 = min(image.width - 1, x0 + 1)
-            wx = source_x - x0
-            target_offset = (y * width + x) * 3
-            offsets = [
-                (y0 * image.width + x0) * 3,
-                (y0 * image.width + x1) * 3,
-                (y1 * image.width + x0) * 3,
-                (y1 * image.width + x1) * 3,
-            ]
-            for channel in range(3):
-                top = image.pixels[offsets[0] + channel] * (1 - wx) + image.pixels[offsets[1] + channel] * wx
-                bottom = image.pixels[offsets[2] + channel] * (1 - wx) + image.pixels[offsets[3] + channel] * wx
-                pixels[target_offset + channel] = int(round(top * (1 - wy) + bottom * wy))
-    return Layer(width, height, pixels, bytearray([255]) * (width * height))
+def _html_document(width: int, height: int, body: str, css: str) -> str:
+    return f"""<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width={width}, initial-scale=1">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=DM+Sans:wght@300;400;500&display=swap');
+  </style>
+  <style>
+    * {{ box-sizing: border-box; }}
+    html, body {{ margin: 0; padding: 0; width: {width}px; height: {height}px; overflow: hidden; }}
+    body {{ background: var(--bg, #FAF7F4); color: var(--ink, #1E1A18); font-family: 'DM Sans', sans-serif; }}
+    {css}
+  </style>
+</head>
+<body>{body}</body>
+</html>
+"""
 
 
-def _rotate_layer(layer: Layer, degrees: float) -> Layer:
-    radians = math.radians(degrees)
-    cos_value = math.cos(radians)
-    sin_value = math.sin(radians)
-    width = int(abs(layer.width * cos_value) + abs(layer.height * sin_value)) + 2
-    height = int(abs(layer.width * sin_value) + abs(layer.height * cos_value)) + 2
-    pixels = bytearray(width * height * 3)
-    mask = bytearray(width * height)
-    source_cx = layer.width / 2
-    source_cy = layer.height / 2
-    target_cx = width / 2
-    target_cy = height / 2
-    for y in range(height):
-        dy = y - target_cy
-        for x in range(width):
-            dx = x - target_cx
-            source_x = int(round(dx * cos_value + dy * sin_value + source_cx))
-            source_y = int(round(-dx * sin_value + dy * cos_value + source_cy))
-            if 0 <= source_x < layer.width and 0 <= source_y < layer.height:
-                source_index = source_y * layer.width + source_x
-                alpha = layer.mask[source_index]
-                if alpha:
-                    target_index = y * width + x
-                    source_offset = source_index * 3
-                    target_offset = target_index * 3
-                    pixels[target_offset : target_offset + 3] = layer.pixels[source_offset : source_offset + 3]
-                    mask[target_index] = alpha
-    return Layer(width, height, pixels, mask)
+def _mockup_css() -> str:
+    return """
+:root {
+  --bg: #FAF7F4;
+  --paper: #FFFFFF;
+  --ink: #1E1A18;
+  --sub: #7A6E68;
+  --accent: #C4856A;
+  --accent-light: #F0DDD5;
+  --accent-2: #9BAF97;
+  --gold: #C9A96E;
+  --line: #EDE5DF;
+  --shadow: rgba(80, 50, 35, 0.12);
+}
+.scene { position: relative; width: 100%; height: 100%; overflow: hidden; background: radial-gradient(ellipse at 70% 30%, #F5EDE6 0%, var(--bg) 60%); }
+.scene::before { content: ""; position: absolute; inset: 32px; border: 1px solid var(--line); pointer-events: none; z-index: 20; }
+p { margin: 0 0 18px; color: var(--accent); font: 500 18px 'DM Sans', sans-serif; letter-spacing: .18em; text-transform: uppercase; }
+h1 { margin: 0; max-width: 760px; color: var(--ink); font: 300 72px/1.05 'Cormorant Garamond', serif; letter-spacing: -0.02em; }
+span { display: block; margin-top: 26px; max-width: 650px; color: var(--sub); font: 300 28px/1.6 'DM Sans', sans-serif; }
+.tablet-copy { position: absolute; left: 120px; top: 130px; width: 600px; z-index: 3; }
+.tablet-scene .device-wrapper { position: absolute; left: 690px; top: 260px; transform: scale(1.25); transform-origin: top left; }
+.device-wrapper { position: relative; width: 520px; height: 700px; }
+.device-frame { position: absolute; inset: 0; background: #1C1C1E; border-radius: 36px; box-shadow: 0 0 0 2px #3A3A3C, 0 0 0 8px #2C2C2E, 0 40px 80px rgba(0,0,0,0.35); }
+.device-frame::before { content: ''; position: absolute; top: 14px; left: 50%; transform: translateX(-50%); width: 120px; height: 8px; background: #2C2C2E; border-radius: 4px; }
+.device-frame::after { content: ''; position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%); width: 80px; height: 4px; background: #3A3A3C; border-radius: 2px; }
+.device-screen { position: absolute; top: 34px; left: 16px; right: 16px; bottom: 28px; border-radius: 22px; overflow: hidden; background: #000; }
+.device-screen img { width: 100%; height: 100%; object-fit: cover; object-position: top center; display: block; }
+.stack-copy { position: absolute; left: 118px; top: 118px; z-index: 4; }
+.paper-sheet { position: absolute; width: 940px; height: 1217px; border-radius: 16px; background-color: var(--paper); background-size: cover; background-position: top center; box-shadow: 0 20px 60px var(--shadow); transform-origin: 50% 50%; }
+.paper-sheet::after { content: ""; position: absolute; inset: 0; border-radius: 16px; pointer-events: none; }
+.spread-title { position: absolute; left: 128px; top: 92px; }
+.spread-book { position: absolute; left: 250px; top: 294px; display: flex; align-items: stretch; gap: 68px; }
+.spread-card { width: 760px; height: 984px; padding: 0; border-radius: 16px; background: var(--paper); box-shadow: 0 20px 60px var(--shadow); overflow: hidden; }
+.spread-card img { width: 100%; height: 100%; object-fit: cover; object-position: top center; display: block; }
+.spine { width: 28px; height: 984px; border-radius: 999px; background: linear-gradient(90deg, rgba(155,175,151,.10), rgba(196,133,106,.24), rgba(201,169,110,.18)); }
+.cover-copy { position: absolute; left: 112px; top: 122px; z-index: 5; }
+.cover-card { position: absolute; width: 880px; height: 1139px; padding: 0; border-radius: 16px; background: var(--paper); box-shadow: 0 20px 60px var(--shadow); transform-origin: 50% 82%; overflow: hidden; }
+.cover-card img { width: 100%; height: 100%; object-fit: cover; object-position: top center; display: block; }
+.detail-copy { position: absolute; left: 118px; top: 94px; z-index: 3; }
+.detail-card { position: absolute; left: 260px; top: 260px; width: 1280px; height: 760px; overflow: hidden; border-radius: 16px; background: var(--paper); box-shadow: 0 20px 60px var(--shadow); }
+.detail-card img { width: 100%; height: 1382px; object-fit: cover; object-position: top center; display: block; }
+.bundle-heading { position: absolute; left: 110px; top: 90px; z-index: 4; }
+.bundle-heading h1 { max-width: 900px; }
+.bundle-grid { position: absolute; left: 238px; top: 306px; display: grid; grid-template-columns: repeat(6, 235px); grid-auto-rows: 304px; column-gap: 57px; row-gap: 52px; }
+.bundle-card { width: 235px; height: 304px; padding: 0; border-radius: 16px; background: var(--paper); box-shadow: 0 20px 60px var(--shadow); overflow: hidden; }
+.bundle-card img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: top center; }
+.fan-card { position: absolute; width: 420px; height: 544px; padding: 0; border-radius: 16px; background: var(--paper); box-shadow: 0 20px 60px var(--shadow); transform-origin: 50% 92%; overflow: hidden; }
+.fan-card img { width: 100%; height: 100%; object-fit: cover; object-position: top center; display: block; }
+"""
 
 
-def _paste_layer(canvas: Bitmap, layer: Layer, x: int, y: int) -> None:
-    for row in range(layer.height):
-        target_y = y + row
-        if target_y < 0 or target_y >= canvas.height:
-            continue
-        for column in range(layer.width):
-            target_x = x + column
-            if target_x < 0 or target_x >= canvas.width:
-                continue
-            alpha = layer.mask[row * layer.width + column]
-            if not alpha:
-                continue
-            source_offset = (row * layer.width + column) * 3
-            target_offset = (target_y * canvas.width + target_x) * 3
-            if alpha == 255:
-                canvas.pixels[target_offset : target_offset + 3] = layer.pixels[source_offset : source_offset + 3]
-            else:
-                for channel in range(3):
-                    canvas.pixels[target_offset + channel] = (
-                        layer.pixels[source_offset + channel] * alpha + canvas.pixels[target_offset + channel] * (255 - alpha)
-                    ) // 255
-
-
-def _crop_bitmap(image: Bitmap, left: int, top: int, right: int, bottom: int) -> Bitmap:
-    left = max(0, min(image.width - 1, left))
-    top = max(0, min(image.height - 1, top))
-    right = max(left + 1, min(image.width, right))
-    bottom = max(top + 1, min(image.height, bottom))
-    width = right - left
-    height = bottom - top
-    pixels = bytearray(width * height * 3)
-    for y in range(height):
-        source_offset = ((top + y) * image.width + left) * 3
-        target_offset = y * width * 3
-        pixels[target_offset : target_offset + width * 3] = image.pixels[source_offset : source_offset + width * 3]
-    return Bitmap(width, height, pixels)
-
-
-def _rounded_rect(canvas: Bitmap, x: int, y: int, width: int, height: int, color: tuple[int, int, int], radius: int) -> None:
-    for row in range(height):
-        for column in range(width):
-            dx = min(column, width - column - 1)
-            dy = min(row, height - row - 1)
-            if dx >= radius or dy >= radius or (dx - radius) ** 2 + (dy - radius) ** 2 <= radius**2:
-                tx = x + column
-                ty = y + row
-                if 0 <= tx < canvas.width and 0 <= ty < canvas.height:
-                    offset = (ty * canvas.width + tx) * 3
-                    canvas.pixels[offset : offset + 3] = bytes(color)
-
-
-def _soft_shadow(canvas: Bitmap, x: int, y: int, width: int, height: int, spread: int, strength: float) -> None:
-    outer = min(32, max(8, spread))
-    middle = max(5, outer // 2)
-    canvas.rect(x - outer, y - outer, width + outer * 2, height + outer * 2, (226, 219, 210))
-    canvas.rect(x - middle, y - middle, width + middle * 2, height + middle * 2, (214, 204, 193))
-    canvas.rect(x + 4, y + 5, width, height, (198, 186, 173))
-
-
-def _blend_rect(canvas: Bitmap, x: int, y: int, width: int, height: int, color: tuple[int, int, int], alpha: float) -> None:
-    if alpha <= 0:
-        return
-    left = max(0, int(x))
-    top = max(0, int(y))
-    right = min(canvas.width, int(x + width))
-    bottom = min(canvas.height, int(y + height))
-    if right <= left or bottom <= top:
-        return
-    inv = 1.0 - alpha
-    for row in range(top, bottom):
-        offset = (row * canvas.width + left) * 3
-        for _ in range(left, right):
-            canvas.pixels[offset] = int(canvas.pixels[offset] * inv + color[0] * alpha)
-            canvas.pixels[offset + 1] = int(canvas.pixels[offset + 1] * inv + color[1] * alpha)
-            canvas.pixels[offset + 2] = int(canvas.pixels[offset + 2] * inv + color[2] * alpha)
-            offset += 3
+def _contact_sheet_css() -> str:
+    return """
+:root {
+  --bg: #FAF7F4;
+  --paper: #FFFFFF;
+  --ink: #1E1A18;
+  --sub: #7A6E68;
+  --accent: #C4856A;
+  --accent-light: #F0DDD5;
+  --accent-2: #9BAF97;
+  --gold: #C9A96E;
+  --line: #EDE5DF;
+  --shadow: rgba(80, 50, 35, 0.12);
+}
+.contact-sheet { position: relative; width: 100%; height: 100%; padding: var(--margin); background: radial-gradient(ellipse at 70% 30%, #F5EDE6 0%, var(--bg) 60%); }
+.contact-sheet::before { content: ""; position: absolute; inset: 32px; border: 1px solid var(--line); pointer-events: none; }
+h1 { margin: 0 0 38px; color: var(--ink); font: 300 56px/1.05 'Cormorant Garamond', serif; letter-spacing: -0.02em; }
+.contact-grid { display: grid; grid-template-columns: repeat(var(--columns), var(--thumb-w)); gap: var(--gutter); }
+figure { margin: 0; width: var(--thumb-w); }
+figure img { display: block; width: var(--thumb-w); height: var(--thumb-h); object-fit: cover; object-position: top center; background: var(--paper); border-radius: 16px; box-shadow: 0 20px 60px var(--shadow); }
+figcaption { height: 32px; padding-top: 12px; color: var(--sub); font: 500 18px 'DM Sans', sans-serif; letter-spacing: .10em; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+"""
 
 
 def _not_blank(image: Bitmap) -> bool:
@@ -671,6 +599,29 @@ def _natural_key(path: Path) -> tuple[int, str]:
 def _contact_label(value: str) -> str:
     cleaned = value.replace("_", " ").replace("-", " ")
     return "".join(char if char.isalnum() or char == " " else " " for char in cleaned)[:26]
+
+
+def _write_fallback_png(output_path: Path, width: int, height: int, sources: Sequence[Path]) -> None:
+    canvas = Bitmap.solid(width, height, (247, 243, 239))
+    canvas.rect(0, 0, width, max(12, height // 80), (201, 148, 138))
+    canvas.rect(width // 18, height // 16, width - width // 9, height - height // 8, (250, 250, 250))
+    canvas.rect(width // 12, height // 10, width - width // 6, max(4, height // 300), (168, 144, 128))
+    if sources:
+        canvas.text(_contact_label(sources[0].stem), width // 12, height // 8, max(10, min(width, height) // 80), (45, 39, 35))
+    canvas.text("HTML render fallback", width // 12, height // 8 + max(26, height // 35), max(8, min(width, height) // 110), (127, 112, 104))
+    write_png(canvas, output_path)
+
+
+def _asset_uri(path: Path) -> str:
+    return html.escape(path.resolve().as_uri(), quote=True)
+
+
+def _css_url(path: Path) -> str:
+    return f'"{_asset_uri(path)}"'
+
+
+def _e(value: object) -> str:
+    return html.escape(str(value), quote=True)
 
 
 def _read_json_if_exists(path: Path) -> dict:

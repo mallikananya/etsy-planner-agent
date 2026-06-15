@@ -9,7 +9,7 @@ description = "Local-first deterministic pipeline for Etsy printable planner pro
 readme = "README.md"
 requires-python = ">=3.9"
 authors = [{ name = "Etsy Planner Agent" }]
-dependencies = []
+dependencies = ["playwright>=1.44"]
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0"]

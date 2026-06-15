@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import html
 import json
 import math
 import shutil
@@ -11,10 +12,8 @@ from typing import Iterable, List, Sequence
 from planner_generator.brand_system import Palette, atelier_system
 from planner_generator.market_intelligence.models import DifferentiationBrief, ListingUpgradePath, NicheBrief, ProductConcept
 from planner_generator.planner_specs.models import BundleSpec, PageSpec
-from planner_generator.rendering.pdf_to_png import pdf_to_png
-from planner_generator.rendering.pdf_canvas import PdfCanvas
-from planner_generator.rendering.png_canvas import PngCanvas, RGB, hex_to_rgb
-from planner_generator.review import Bitmap, read_png, resize_to_fit, write_png
+from planner_generator.rendering.html_to_png import render_html_to_png
+from planner_generator.review import Bitmap, read_png, write_png
 from planner_generator.theme_engine.models import Theme
 
 
@@ -22,52 +21,6 @@ LISTING_WIDTH = 2000
 LISTING_HEIGHT = 1600
 THUMBNAIL_WIDTH = 500
 THUMBNAIL_HEIGHT = 400
-
-
-class PngSlideCanvas:
-    """PDF-coordinate-compatible canvas that writes carousel slides directly to PNG."""
-
-    def __init__(self, width: int, height: int, background: str) -> None:
-        self.width = width
-        self.height = height
-        self._canvas = PngCanvas(width, height, _rgb(background))
-
-    def rect(
-        self,
-        x: float,
-        y: float,
-        width: float,
-        height: float,
-        stroke: str | None = None,
-        fill: str | None = None,
-        stroke_width: float = 1.0,
-    ) -> None:
-        top = self.height - y - height
-        if fill:
-            self._canvas.rect(x, top, width, height, _rgb(fill))
-        if stroke:
-            color = _rgb(stroke)
-            line_width = max(1, int(round(stroke_width)))
-            self._canvas.rect(x, top, width, line_width, color)
-            self._canvas.rect(x, top + height - line_width, width, line_width, color)
-            self._canvas.rect(x, top, line_width, height, color)
-            self._canvas.rect(x + width - line_width, top, line_width, height, color)
-
-    def line(self, x1: float, y1: float, x2: float, y2: float, color: str, width: float = 1.0) -> None:
-        self._canvas.line(x1, self.height - y1, x2, self.height - y2, _rgb(color), max(1, int(round(width))))
-
-    def text(self, value: str, x: float, y: float, size: float, color: str, font: str = "sans") -> None:
-        rendered_size = max(1, int(round(size * 0.65)))
-        self._canvas.text(value, x, self.height - y - size, rendered_size, _rgb(color))
-
-    def image(self, path: str | Path, x: float, y: float, width: float, height: float) -> None:
-        image = read_png(Path(path))
-        thumb = resize_to_fit(image, max(1, int(round(width))), max(1, int(round(height))), (255, 255, 255))
-        bitmap = Bitmap(self.width, self.height, self._canvas._pixels)
-        bitmap.paste(thumb, int(round(x)), int(round(self.height - y - height)))
-
-    def write(self, path: Path) -> None:
-        self._canvas.write(path)
 
 
 @dataclass(frozen=True)
@@ -130,7 +83,7 @@ def write_etsy_listing_carousel(
     files: List[Path] = []
     for slide in slides:
         path = carousel_dir / slide.filename
-        _write_slide_png(path, slide, palette)
+        _write_slide_png(path, slide, context, assets, palette)
         _qa_slide(slide, path)
         _write_thumbnail(path, thumbnail_dir / slide.filename)
         legacy_path = legacy_dir / slide.filename
@@ -180,73 +133,20 @@ class _CampaignContext:
 
 def _slides(context: _CampaignContext, assets: CarouselAssets, palette: Palette) -> List[CarouselSlide]:
     return [
-        CarouselSlide(
-            "01_hero_image.png",
-            "Hero Image",
-            "Stop-scroll thumbnail with dominant real tablet mockup, product promise, and value proof.",
-            "hero",
-            lambda canvas, slide: _hero(canvas, slide, context, assets, palette),
-        ),
-        CarouselSlide(
-            "02_interior_preview.png",
-            "Interior Preview",
-            "Clear planner spreads and page previews using real rendered interiors.",
-            "interior_preview",
-            lambda canvas, slide: _interior_preview(canvas, slide, context, assets, palette),
-        ),
-        CarouselSlide(
-            "03_features.png",
-            "Features",
-            "Conversion callouts tied to real planner mockups and buyer-use cases.",
-            "features",
-            lambda canvas, slide: _features(canvas, slide, context, assets, palette),
-        ),
-        CarouselSlide(
-            "04_whats_included.png",
-            "What's Included",
-            "Abundance/value proof with grouped real pages and bundle stack.",
-            "whats_included",
-            lambda canvas, slide: _included(canvas, slide, context, assets, palette),
-        ),
-        CarouselSlide(
-            "05_transformation_lifestyle.png",
-            "Transformation / Lifestyle",
-            "Aspirational soft-productivity outcome without fake lifestyle photography.",
-            "transformation",
-            lambda canvas, slide: _transformation(canvas, slide, context, assets, palette),
-        ),
-        CarouselSlide(
-            "06_cover_options.png",
-            "Cover Options",
-            "Elegant cover collection using alternate generated cover mockups.",
-            "cover_options",
-            lambda canvas, slide: _covers(canvas, slide, context, assets, palette),
-        ),
-        CarouselSlide(
-            "07_device_print_compatibility.png",
-            "Device / Print Compatibility",
-            "Reduces hesitation by showing digital, print, and instant-download formats.",
-            "compatibility",
-            lambda canvas, slide: _compatibility(canvas, slide, context, assets, palette),
-        ),
-        CarouselSlide(
-            "08_detail_closeup.png",
-            "Detail / Close-Up",
-            "Premium design-quality proof with real close-up render and visible page details.",
-            "detail_closeup",
-            lambda canvas, slide: _detail(canvas, slide, context, assets, palette),
-        ),
+        CarouselSlide("01_hero_image.png", "Hero Image", "Stop-scroll thumbnail with dominant real tablet mockup, product promise, and value proof.", "hero", _hero),
+        CarouselSlide("02_interior_preview.png", "Interior Preview", "Clear planner spreads and page previews using real rendered interiors.", "interior_preview", _interior_preview),
+        CarouselSlide("03_features.png", "Features", "Conversion callouts tied to real planner mockups and buyer-use cases.", "features", _features),
+        CarouselSlide("04_whats_included.png", "What's Included", "Abundance/value proof with grouped real pages and bundle stack.", "whats_included", _included),
+        CarouselSlide("05_transformation_lifestyle.png", "Transformation / Lifestyle", "Aspirational soft-productivity outcome without fake lifestyle photography.", "transformation", _transformation),
+        CarouselSlide("06_cover_options.png", "Cover Options", "Elegant cover collection using alternate generated cover mockups.", "cover_options", _covers),
+        CarouselSlide("07_device_print_compatibility.png", "Device / Print Compatibility", "Reduces hesitation by showing digital, print, and instant-download formats.", "compatibility", _compatibility),
+        CarouselSlide("08_detail_closeup.png", "Detail / Close-Up", "Premium design-quality proof with real close-up render and visible page details.", "detail_closeup", _detail),
     ]
 
 
 def _load_carousel_assets(output_dir: Path) -> CarouselAssets:
     output_root = output_dir.parent
-    mockup_manifest = _first_existing(
-        [
-            output_root / "mockups" / "manifest.json",
-            Path("output/mockups/manifest.json"),
-        ]
-    )
+    mockup_manifest = _first_existing([output_root / "mockups" / "manifest.json", Path("output/mockups/manifest.json")])
     tablets: List[SourceAsset] = []
     paper_stacks: List[SourceAsset] = []
     spreads: List[SourceAsset] = []
@@ -309,23 +209,44 @@ def _load_carousel_assets(output_dir: Path) -> CarouselAssets:
     return CarouselAssets(tablets, paper_stacks, spreads, covers, details, bundle_overviews, page_previews, cover_previews, mockup_manifest)
 
 
-def _hero(canvas: PdfCanvas, slide: CarouselSlide, context: _CampaignContext, assets: CarouselAssets, p: Palette) -> None:
-    line_one, line_two = _hero_title_lines(context.product_name)
-    tagline = _hero_tagline(context)
-    _campaign_background(canvas, p, accent="#D8C5B9", warm=True)
-    _vertical_band(canvas, 0, "#C9B9A9", 0.16)
-    _text_block(canvas, slide, line_one, 136, 190, 96 if line_two else 84, p.ink, "serif", max_width=660)
-    if line_two:
-        _text_block(canvas, slide, line_two, 142, 306, 56, p.ink, "serif", max_width=650)
-    _text_block(canvas, slide, tagline, 148, 402, 30, p.umber, "serif", max_width=620, leading=38)
-    _badge(canvas, slide, f"{context.page_count or 52} PAGE SYSTEM", 150, 544, 250)
-    _badge(canvas, slide, "GOODNOTES READY", 430, 544, 290)
-    _badge(canvas, slide, "INSTANT DOWNLOAD", 150, 618, 318)
-    _place_image(canvas, slide, assets.tablets[1 if len(assets.tablets) > 1 else 0], 820, 180, 920, 690, shadow=34)
-    _place_image(canvas, slide, assets.covers[0], 1100, 812, 430, 565, shadow=22)
-    _place_image(canvas, slide, assets.paper_stacks[2 if len(assets.paper_stacks) > 2 else 0], 1472, 720, 360, 450, shadow=18)
-    _caption(canvas, slide, "Planner pages shown are real generated previews", 152, 1416, 22)
-    _brand(canvas, slide, 152, 96)
+def _hero(context: _CampaignContext, assets: CarouselAssets, palette: Palette) -> str:
+    concept = context.product_concept
+    brief = context.market_brief
+    differentiation = context.differentiation
+    product_name = str(getattr(concept, "product_name", None) or context.product_name or context.bundle.name)
+    promise = str(getattr(concept, "promise", None) or "Your most productive year starts here.")
+    audience = str(getattr(brief, "audience", None) or getattr(concept, "buyer_persona", None) or "the girl who wants to plan beautifully")
+    visual_direction = ", ".join(str(value) for value in (getattr(concept, "visual_direction", None) or []) if str(value).strip())
+    listing_visual_direction = str(getattr(differentiation, "listing_visual_direction", None) or visual_direction or "premium digital planner")
+    subhead = f"{promise} Made for {audience}." if audience.lower() not in promise.lower() else promise
+    screen_asset = assets.page_previews[0] if assets.page_previews else assets.tablets[0]
+    year = next((token.strip(".,") for token in product_name.split() if token.strip(".,").isdigit() and len(token.strip(".,")) == 4), "2026")
+    return _slide_page(
+        "hero-slide",
+        f"""
+<section class="hero-copy" style="--visual-direction-hint: '{_e(visual_direction or listing_visual_direction)}'; --listing-visual-direction-hint: '{_e(listing_visual_direction)}';">
+  <p class="kicker">DIGITAL PLANNER · {_e(year)}</p>
+  <h1>{_e(product_name)}</h1>
+  <p class="subhead">{_e(promise or subhead)}</p>
+  <div class="badge-row">
+    {_pill(f"{context.page_count or 52} pages")}
+    {_pill("GoodNotes ready")}
+    {_pill("Instant download")}
+  </div>
+  <p class="hero-tagline">Designed for the girl who plans with intention.</p>
+</section>
+<section class="hero-visual">
+  <div class="corner-line"></div>
+  <div class="device-wrapper">
+    <div class="device-frame"></div>
+    <div class="device-screen">
+      <img src="{_asset_uri(screen_asset.path)}" alt="">
+    </div>
+  </div>
+  <img class="hero-cover overlap-card" src="{_asset_uri(assets.covers[0].path)}" alt="">
+</section>
+""",
+    )
 
 
 def _hero_title_lines(product_name: str) -> tuple[str, str]:
@@ -347,260 +268,433 @@ def _hero_tagline(context: _CampaignContext) -> str:
     return "Digital + printable planning pages for calm routines, gentle structure, and intentional days."
 
 
-def _interior_preview(canvas: PdfCanvas, slide: CarouselSlide, context: _CampaignContext, assets: CarouselAssets, p: Palette) -> None:
-    _campaign_background(canvas, p, accent="#E8D5CD", warm=False)
-    _slide_kicker(canvas, slide, "Interior Preview", "Inside the planner", 106, 106)
-    _text_block(canvas, slide, "Clear pages, not mystery templates.", 106, 238, 48, p.ink, "serif", max_width=620)
-    _text_block(canvas, slide, "See the actual layouts before purchase: rituals, weekly rhythm, wellness maps, reflections, and notes.", 108, 314, 26, p.umber, "serif", max_width=690, leading=34)
-    for index, asset in enumerate(_select_evenly(assets.spreads, min(3, len(assets.spreads)))):
-        _place_image(canvas, slide, asset, 100 + index * 610, 612 + (26 if index == 1 else 0), 560, 382, shadow=22)
-    for index, asset in enumerate(_select_evenly(assets.paper_stacks, min(4, len(assets.paper_stacks)))):
-        _place_image(canvas, slide, asset, 214 + index * 415, 1030 + (24 if index % 2 else 0), 300, 375, shadow=14)
-    _badge(canvas, slide, "REAL PAGE SPREADS", 1030, 220, 300)
-    _badge(canvas, slide, "READABLE PREVIEWS", 1360, 220, 315)
-    _brand(canvas, slide, 106, 1440)
+def _interior_preview(context: _CampaignContext, assets: CarouselAssets, palette: Palette) -> str:
+    spreads = "".join(f'<img class="spread-thumb" src="{_asset_uri(asset.path)}" alt="">' for asset in _select_evenly(assets.spreads, min(3, len(assets.spreads))))
+    stacks = "".join(f'<img class="stack-thumb" src="{_asset_uri(asset.path)}" alt="">' for asset in _select_evenly(assets.paper_stacks, min(4, len(assets.paper_stacks))))
+    concept = context.product_concept
+    brief = context.market_brief
+    included_titles = [str(value) for value in (getattr(concept, "included_page_titles", None) or context.page_titles or []) if str(value).strip()]
+    preview_names = ", ".join(included_titles[:3])
+    product_name = str(getattr(concept, "product_name", None) or context.product_name or context.bundle.name)
+    kicker = str(getattr(concept, "listing_angle", None) or getattr(brief, "name", None) or "Interior preview")
+    subhead = f"Preview {preview_names.lower()} from {product_name} before purchase." if preview_names else f"Preview actual pages from {product_name} before purchase."
+    return _slide_page(
+        "interior-slide",
+        f"""
+<section class="slide-heading">
+  <p class="kicker">{_e(kicker)}</p>
+  <h1>Inside {_e(product_name)}</h1>
+  <p class="subhead">{_e(subhead)}</p>
+</section>
+<section class="interior-row">{spreads}</section>
+<section class="interior-stack-row">{stacks}</section>
+""",
+    )
 
 
-def _features(canvas: PdfCanvas, slide: CarouselSlide, context: _CampaignContext, assets: CarouselAssets, p: Palette) -> None:
-    _campaign_background(canvas, p, accent="#D5DDD1", warm=True)
-    _place_image(canvas, slide, assets.tablets[4 if len(assets.tablets) > 4 else -1], 595, 202, 810, 608, shadow=32)
-    _text_block(canvas, slide, "Plan gently. Follow through beautifully.", 134, 118, 60, p.ink, "serif", max_width=780)
-    _callout(canvas, slide, "Hyperlinked PDF navigation", "Move through sections quickly", 132, 360, 620, 420)
-    _callout(canvas, slide, "Routine + wellness pages", "Planning that feels like care", 126, 618, 662, 608)
-    _callout(canvas, slide, "Trackers + reflections", "See patterns without pressure", 1430, 388, 1320, 470)
-    _callout(canvas, slide, "GoodNotes compatible", "Designed for iPad planning", 1434, 638, 1298, 648)
-    _place_image(canvas, slide, assets.details[1 if len(assets.details) > 1 else 0], 180, 1020, 620, 413, shadow=18)
-    _place_image(canvas, slide, assets.paper_stacks[5 if len(assets.paper_stacks) > 5 else -1], 1212, 940, 420, 525, shadow=18)
-    _brand(canvas, slide, 112, 1450)
+def _features(context: _CampaignContext, assets: CarouselAssets, palette: Palette) -> str:
+    concept = context.product_concept
+    brief = context.market_brief
+    differentiation = context.differentiation
+    product_name = str(getattr(concept, "product_name", None) or context.product_name or context.bundle.name)
+    promise = str(getattr(concept, "promise", None) or "Your most productive year starts here.")
+    differentiators = [str(value) for value in (getattr(differentiation, "differentiators", None) or []) if str(value).strip()]
+    for fallback in ["Hyperlinked PDF", "GoodNotes ready", "Instant download", f"{context.page_count or 52} planning pages"]:
+        if len(differentiators) >= 4:
+            break
+        if fallback not in differentiators:
+            differentiators.append(fallback)
+    bodies = [
+        str(getattr(brief, "angle", None) or promise),
+        "Built for fast, flexible planning sessions",
+        "Clear sections keep routines easy to revisit",
+        f"Designed for {str(getattr(concept, 'buyer_persona', None) or getattr(brief, 'audience', None) or 'the girl who wants to plan beautifully')}",
+    ]
+    return _slide_page(
+        "features-slide",
+        f"""
+<section class="feature-title">
+  <p class="kicker">{_e(str(getattr(concept, "listing_angle", None) or "Planner features"))}</p>
+  <h1>{_e(promise)}</h1>
+</section>
+<div class="ipad-frame feature-ipad"><img src="{_asset_uri(assets.tablets[0].path)}" alt=""></div>
+{_callout_html(differentiators[0], bodies[0], "feature-callout c1")}
+{_callout_html(differentiators[1], bodies[1], "feature-callout c2")}
+{_callout_html(differentiators[2], bodies[2], "feature-callout c3")}
+{_callout_html(differentiators[3], bodies[3], "feature-callout c4")}
+<div class="connector l1"></div><div class="connector l2"></div><div class="connector l3"></div><div class="connector l4"></div>
+""",
+    )
 
 
-def _included(canvas: PdfCanvas, slide: CarouselSlide, context: _CampaignContext, assets: CarouselAssets, p: Palette) -> None:
-    _campaign_background(canvas, p, accent="#DFD1C4", warm=False)
-    _slide_kicker(canvas, slide, "What's Included", "Complete planner bundle", 110, 96)
-    _text_block(canvas, slide, f"{context.page_count or 52} premium planning pages", 110, 236, 76, p.ink, "serif", max_width=680)
-    _text_block(canvas, slide, "A full library for routines, weekly planning, meals, movement, reflection, habits, self-care, and notes.", 114, 438, 27, p.umber, "serif", max_width=680, leading=36)
+def _included(context: _CampaignContext, assets: CarouselAssets, palette: Palette) -> str:
     overview = assets.bundle_overviews[0] if assets.bundle_overviews else assets.paper_stacks[0]
-    _place_image(canvas, slide, overview, 840, 118, 920, 670, shadow=28)
-    groups = [
-        ("01", "Complete PDF planners", "US Letter + A4"),
-        ("02", "Individual pages", "Flexible printing"),
-        ("03", "Cover collection", "Soft neutral options"),
-        ("04", "Instant delivery", "Customer ZIP download"),
+    concept = context.product_concept
+    brief = context.market_brief
+    included_titles = [str(value) for value in (getattr(concept, "included_page_titles", None) or context.page_titles or []) if str(value).strip()]
+    for fallback in ["Complete PDF planner", "Printable pages", "Cover collection", "Instant delivery"]:
+        if len(included_titles) >= 4:
+            break
+        included_titles.append(fallback)
+    row_bodies = [
+        f"Part of the {context.page_count or 52}-page bundle",
+        str(getattr(concept, "promise", None) or "Designed for clear weekly follow-through"),
+        str(getattr(brief, "audience", None) or "Made for flexible digital or printed planning"),
+        "Ready to download after purchase",
     ]
-    for index, (number, title, body) in enumerate(groups):
-        _included_row(canvas, slide, number, title, body, 142, 622 + index * 152)
-    for index, asset in enumerate(_select_evenly(assets.paper_stacks, min(5, len(assets.paper_stacks)))):
-        _place_image(canvas, slide, asset, 470 + index * 238, 1120 + (24 if index % 2 else 0), 180, 225, shadow=10)
-    _brand(canvas, slide, 112, 1450)
+    rows = "".join(
+        _included_row_html(number, title, body)
+        for number, title, body in zip(["01", "02", "03", "04"], included_titles[:4], row_bodies)
+    )
+    strip = "".join(f'<img src="{_asset_uri(asset.path)}" alt="">' for asset in _select_evenly(assets.paper_stacks, min(5, len(assets.paper_stacks))))
+    return _slide_page(
+        "included-slide",
+        f"""
+<section class="included-copy">
+  <p class="kicker">{_e(str(getattr(concept, "listing_angle", None) or "What's included"))}</p>
+  <h1>{context.page_count or 52} pages inside {_e(str(getattr(concept, "product_name", None) or context.product_name or context.bundle.name))}</h1>
+  <div class="included-list">{rows}</div>
+</section>
+<img class="included-overview" src="{_asset_uri(overview.path)}" alt="">
+<section class="bottom-strip">{strip}</section>
+""",
+    )
 
 
-def _transformation(canvas: PdfCanvas, slide: CarouselSlide, context: _CampaignContext, assets: CarouselAssets, p: Palette) -> None:
-    _campaign_background(canvas, p, accent="#EACCC5", warm=True)
-    _text_block(canvas, slide, "From scattered lists to a softer rhythm.", 118, 134, 70, p.ink, "serif", max_width=760)
-    _text_block(canvas, slide, "Romanticize the ordinary: morning rituals, nourishing weeks, reflective evenings, and visible priorities.", 122, 328, 29, p.umber, "serif", max_width=740, leading=38)
-    _place_image(canvas, slide, assets.tablets[2 if len(assets.tablets) > 2 else 0], 916, 172, 790, 593, shadow=34)
-    _place_image(canvas, slide, assets.paper_stacks[3 if len(assets.paper_stacks) > 3 else 0], 214, 784, 420, 525, shadow=20)
-    _place_image(canvas, slide, assets.details[2 if len(assets.details) > 2 else 0], 760, 910, 840, 560, shadow=20)
-    _micro_story(canvas, slide, "Before", "mental tabs, scattered notes", 146, 548)
-    _micro_story(canvas, slide, "After", "calm structure, visible next steps", 430, 548)
-    _brand(canvas, slide, 118, 1450)
+def _transformation(context: _CampaignContext, assets: CarouselAssets, palette: Palette) -> str:
+    headline = _transformation_headline(context)
+    concept = context.product_concept
+    brief = context.market_brief
+    buyer_persona = str(getattr(concept, "buyer_persona", None) or getattr(brief, "audience", None) or "the girl who wants to plan beautifully")
+    hooks = [str(value) for value in (getattr(brief, "description_hooks", None) or []) if str(value).strip()]
+    promise = str(getattr(concept, "promise", None) or "Your most productive year starts here.")
+    body = " ".join(hooks[:2]) if hooks else f"A planning flow for {buyer_persona}, built around {promise.lower()}"
+    before = str(getattr(brief, "angle", None) or "Scattered notes, open tabs, and decisions living in your head")
+    after = str(getattr(concept, "promise", None) or "Clear priorities, calmer routines, and visible next steps")
+    return _slide_page(
+        "transformation-slide",
+        f"""
+<section class="transformation-copy">
+  <p class="kicker">{_e(str(getattr(concept, "listing_angle", None) or "The transformation"))}</p>
+  <h1>{_e(headline)}</h1>
+  <p class="subhead">{_e(body)}</p>
+  <div class="before-after">
+    <div><strong>Before</strong><span>{_e(before)}</span></div>
+    <div><strong>After</strong><span>{_e(after)}</span></div>
+  </div>
+</section>
+<img class="trans-tablet" src="{_asset_uri(assets.tablets[2 if len(assets.tablets) > 2 else 0].path)}" alt="">
+<img class="trans-stack" src="{_asset_uri(assets.paper_stacks[3 if len(assets.paper_stacks) > 3 else 0].path)}" alt="">
+""",
+    )
 
 
-def _covers(canvas: PdfCanvas, slide: CarouselSlide, context: _CampaignContext, assets: CarouselAssets, p: Palette) -> None:
-    _campaign_background(canvas, p, accent="#D8CFC2", warm=False)
-    _slide_kicker(canvas, slide, "Cover Options", "Soft neutral collection", 108, 104)
-    _text_block(canvas, slide, "Choose the mood for your planning season.", 108, 238, 56, p.ink, "serif", max_width=700)
-    _text_block(canvas, slide, "Alternate covers give the digital planner the feeling of a curated stationery set.", 112, 398, 27, p.umber, "serif", max_width=650, leading=36)
-    cover_assets = assets.covers[:5]
-    start_x = 168
-    for index, asset in enumerate(cover_assets):
-        x = start_x + index * 335
-        y = 650 + (48 if index % 2 else 0)
-        _place_image(canvas, slide, asset, x, y, 285, 374, shadow=20)
-        _caption(canvas, slide, _cover_label(asset, index), x + 18, y + 416, 19)
-    _place_image(canvas, slide, assets.cover_previews[0] if assets.cover_previews else cover_assets[0], 1420, 156, 300, 388, shadow=16)
-    _badge(canvas, slide, "5 COVER STYLES", 1070, 272, 265)
-    _brand(canvas, slide, 108, 1450)
+def _covers(context: _CampaignContext, assets: CarouselAssets, palette: Palette) -> str:
+    concept = context.product_concept
+    brief = context.market_brief
+    product_name = str(getattr(concept, "product_name", None) or context.product_name or context.bundle.name)
+    cover_count = min(5, len(assets.covers))
+    cards = []
+    for index, asset in enumerate(assets.covers[:5]):
+        cards.append(
+            f"""
+<figure>
+  <img src="{_asset_uri(asset.path)}" alt="">
+  <figcaption>{_e(_cover_label(asset, index))}</figcaption>
+</figure>
+"""
+        )
+    return _slide_page(
+        "covers-slide",
+        f"""
+<section class="slide-heading cover-heading">
+  <p class="kicker">{_e(str(getattr(concept, "listing_angle", None) or getattr(brief, "name", None) or "Cover options"))}</p>
+  <h1>Choose your {_e(product_name)} cover.</h1>
+  {_pill(f"{cover_count} cover styles")}
+</section>
+<section class="cover-row">{"".join(cards)}</section>
+""",
+    )
 
 
-def _compatibility(canvas: PdfCanvas, slide: CarouselSlide, context: _CampaignContext, assets: CarouselAssets, p: Palette) -> None:
-    _campaign_background(canvas, p, accent="#CDD8CA", warm=True)
-    _text_block(canvas, slide, "Use it digitally or print your favorite pages.", 120, 130, 62, p.ink, "serif", max_width=760)
-    _text_block(canvas, slide, "Built for iPad planning and printable desk rituals, so buyers know exactly how it fits their workflow.", 124, 314, 28, p.umber, "serif", max_width=720, leading=36)
-    _place_image(canvas, slide, assets.tablets[0], 832, 156, 780, 585, shadow=32)
-    for index, asset in enumerate(_select_evenly(assets.paper_stacks, min(3, len(assets.paper_stacks)))):
-        _place_image(canvas, slide, asset, 338 + index * 328, 872 + index * 18, 260, 325, shadow=14)
-    rows = [
-        ("iPad PDF", "GoodNotes / Notability"),
-        ("Printable", "US Letter + A4"),
-        ("Delivery", "Instant Etsy download"),
-        ("Files", "Complete PDF bundle"),
-    ]
-    for index, (title, body) in enumerate(rows):
-        _compat_row(canvas, slide, title, body, 1230, 872 + index * 130)
-    _brand(canvas, slide, 120, 1450)
+def _compatibility(context: _CampaignContext, assets: CarouselAssets, palette: Palette) -> str:
+    concept = context.product_concept
+    product_name = str(getattr(concept, "product_name", None) or context.product_name or context.bundle.name)
+    screen_asset = assets.page_previews[0] if assets.page_previews else assets.tablets[0]
+    rows = "".join(
+        f'<div class="compat-row"><strong>{_e(title)}</strong><span>{_e(body)}</span></div>'
+        for title, body in [
+            ("Digital PDF", "GoodNotes and PDF apps"),
+            ("Printable", f"{context.page_count or 52} flexible pages"),
+            ("Delivery", "Instant Etsy download"),
+            ("Files", "Complete planner bundle"),
+        ]
+    )
+    return _slide_page(
+        "compatibility-slide",
+        f"""
+<div class="device-wrapper">
+  <div class="device-frame"></div>
+  <div class="device-screen">
+    <img src="{_asset_uri(screen_asset.path)}" alt="">
+  </div>
+</div>
+<section class="compat-copy">
+  <p class="kicker">Device + print</p>
+  <h1>Use {_e(product_name)} digitally or print your favorite pages.</h1>
+  <div class="compat-list">{rows}</div>
+</section>
+""",
+    )
 
 
-def _detail(canvas: PdfCanvas, slide: CarouselSlide, context: _CampaignContext, assets: CarouselAssets, p: Palette) -> None:
-    _campaign_background(canvas, p, accent="#E4D7CA", warm=False)
-    _slide_kicker(canvas, slide, "Design Details", "Premium page quality", 108, 104)
-    _text_block(canvas, slide, "Elegant structure, readable prompts, generous writing space.", 108, 236, 56, p.ink, "serif", max_width=820)
-    _place_image(canvas, slide, assets.details[0], 206, 520, 1160, 773, shadow=28)
-    _place_image(canvas, slide, assets.paper_stacks[-1], 1390, 780, 340, 425, shadow=18)
-    _callout(canvas, slide, "Editorial serif headings", "Calm visual hierarchy", 1280, 340, 1140, 620)
-    _callout(canvas, slide, "Fine-line layout system", "Designed for repeated use", 1440, 522, 1320, 770)
-    _callout(canvas, slide, "Soft-luxury palette", "Mature feminine styling", 1330, 1294, 1230, 1120)
-    _brand(canvas, slide, 108, 1450)
+def _detail(context: _CampaignContext, assets: CarouselAssets, palette: Palette) -> str:
+    concept = context.product_concept
+    differentiation = context.differentiation
+    product_name = str(getattr(concept, "product_name", None) or context.product_name or context.bundle.name)
+    promise = str(getattr(concept, "promise", None) or "Your most productive year starts here.")
+    differentiators = [str(value) for value in (getattr(differentiation, "differentiators", None) or []) if str(value).strip()]
+    for fallback in ["Hyperlinked PDF", "GoodNotes ready", "Instant download"]:
+        if len(differentiators) >= 3:
+            break
+        if fallback not in differentiators:
+            differentiators.append(fallback)
+    return _slide_page(
+        "detail-slide",
+        f"""
+<section class="detail-heading">
+  <p class="kicker">{_e(str(getattr(concept, "listing_angle", None) or "Design details"))}</p>
+  <h1>{_e(product_name)} details for beautiful planning.</h1>
+</section>
+<img class="detail-main" src="{_asset_uri(assets.details[0].path)}" alt="">
+{_callout_html(differentiators[0], promise, "detail-callout d1")}
+{_callout_html(differentiators[1], "Designed for daily use", "detail-callout d2")}
+{_callout_html(differentiators[2], "Clear writing space and easy scanning", "detail-callout d3")}
+""",
+    )
 
 
-def _campaign_background(canvas: PdfCanvas, p: Palette, accent: str, warm: bool) -> None:
-    base = "#F3EDE5" if warm else "#F7F1EA"
-    canvas.rect(0, 0, LISTING_WIDTH, LISTING_HEIGHT, fill=base)
-    canvas.rect(72, 72, LISTING_WIDTH - 144, LISTING_HEIGHT - 144, fill="#FFFDF8", stroke="#D7CABD", stroke_width=0.7)
-    canvas.rect(72, 72, 20, LISTING_HEIGHT - 144, fill=accent)
-    canvas.rect(92, 72, LISTING_WIDTH - 164, 16, fill="#E5D7CA")
-    canvas.rect(1540, 72, 316, LISTING_HEIGHT - 144, fill=accent)
-    canvas.rect(118, 120, 1250, 1, fill="#D8CBBE")
-    canvas.rect(118, LISTING_HEIGHT - 122, 1250, 1, fill="#D8CBBE")
-
-
-def _vertical_band(canvas: PdfCanvas, x: float, color: str, opacity_hint: float) -> None:
-    canvas.rect(1540 + x, 72, 316, LISTING_HEIGHT - 144, fill=color)
-
-
-def _place_image(
-    canvas: PdfCanvas,
-    slide: CarouselSlide,
-    asset: SourceAsset,
-    x: float,
-    y: float,
-    width: float,
-    height: float,
-    shadow: float = 16,
-) -> None:
-    image = read_png(asset.path)
-    scale = min(width / image.width, height / image.height)
-    placed_w = image.width * scale
-    placed_h = image.height * scale
-    px = x + (width - placed_w) / 2
-    py = y + (height - placed_h) / 2
-    if shadow:
-        _shadow(canvas, px, py, placed_w, placed_h, shadow)
-    canvas.image(asset.path, px, LISTING_HEIGHT - py - placed_h, placed_w, placed_h)
-    slide.assets.append(asset)
-    slide.placements.append((asset.path, px, py, placed_w, placed_h))
-
-
-def _shadow(canvas: PdfCanvas, x: float, y: float, width: float, height: float, amount: float) -> None:
-    canvas.rect(x + amount * 0.42, LISTING_HEIGHT - y - height - amount * 0.52, width, height, fill="#B9AA9B")
-    canvas.rect(x + amount * 0.18, LISTING_HEIGHT - y - height - amount * 0.24, width, height, fill="#D2C5B8")
-
-
-def _text_block(
-    canvas: PdfCanvas,
-    slide: CarouselSlide,
-    value: str,
-    x: float,
-    y: float,
-    size: float,
-    color: str,
-    font: str,
-    max_width: float,
-    leading: float | None = None,
-) -> None:
-    leading = leading or size * 1.05
-    lines = _wrap_text(value, max_width, size, font)
-    for index, line in enumerate(lines):
-        ty = y + index * leading
-        canvas.text(line, x, LISTING_HEIGHT - ty - size, size, color, font=font)
-        slide.text_boxes.append((line, x, ty, min(max_width, _text_width(line, size, font)), size, size))
-
-
-def _slide_kicker(canvas: PdfCanvas, slide: CarouselSlide, label: str, body: str, x: float, y: float) -> None:
-    canvas.text(label.upper(), x, LISTING_HEIGHT - y - 18, 18, "#B87C6E", font="sans")
-    canvas.text(body, x, LISTING_HEIGHT - y - 58, 32, "#3D342D", font="serif")
-    slide.text_boxes.append((label, x, y, _text_width(label, 18, "sans"), 18, 18))
-    slide.text_boxes.append((body, x, y + 40, _text_width(body, 32, "serif"), 32, 32))
-
-
-def _badge(canvas: PdfCanvas, slide: CarouselSlide, text: str, x: float, y: float, width: float) -> None:
-    canvas.rect(x + 8, LISTING_HEIGHT - y - 50 + 8, width, 50, fill="#B9AA9B")
-    canvas.rect(x, LISTING_HEIGHT - y - 50, width, 50, fill="#FFFDF8", stroke="#D7CABD", stroke_width=0.7)
-    canvas.text(text, x + 22, LISTING_HEIGHT - y - 32, 17, "#6C5B4F", font="sans")
-    slide.text_boxes.append((text, x + 22, y + 15, min(width - 44, _text_width(text, 17, "sans")), 17, 17))
-
-
-def _callout(canvas: PdfCanvas, slide: CarouselSlide, title: str, body: str, x: float, y: float, target_x: float, target_y: float) -> None:
-    canvas.text(title, x, LISTING_HEIGHT - y - 24, 24, "#3D342D", font="serif")
-    canvas.text(body, x, LISTING_HEIGHT - y - 56, 17, "#76675B", font="sans")
-    line_start_x = x + (300 if x < target_x else -24)
-    canvas.line(line_start_x, LISTING_HEIGHT - y - 22, target_x, LISTING_HEIGHT - target_y, "#8B7468", 1.0)
-    canvas.rect(target_x - 5, LISTING_HEIGHT - target_y - 5, 10, 10, fill="#8B7468")
-    slide.text_boxes.append((title, x, y, _text_width(title, 24, "serif"), 24, 24))
-    slide.text_boxes.append((body, x, y + 32, _text_width(body, 17, "sans"), 17, 17))
-
-
-def _included_row(canvas: PdfCanvas, slide: CarouselSlide, number: str, title: str, body: str, x: float, y: float) -> None:
-    canvas.text(number, x, LISTING_HEIGHT - y - 38, 38, "#B87C6E", font="serif")
-    canvas.line(x + 74, LISTING_HEIGHT - y - 18, x + 422, LISTING_HEIGHT - y - 18, "#D7CABD", 0.8)
-    canvas.text(title, x + 92, LISTING_HEIGHT - y - 22, 26, "#3D342D", font="serif")
-    canvas.text(body, x + 92, LISTING_HEIGHT - y - 58, 17, "#76675B", font="sans")
-    slide.text_boxes.append((title, x + 92, y, _text_width(title, 26, "serif"), 26, 26))
-
-
-def _micro_story(canvas: PdfCanvas, slide: CarouselSlide, label: str, body: str, x: float, y: float) -> None:
-    canvas.rect(x + 8, LISTING_HEIGHT - y - 92 + 8, 244, 92, fill="#CBBBAE")
-    canvas.rect(x, LISTING_HEIGHT - y - 92, 244, 92, fill="#FFFDF8", stroke="#D7CABD", stroke_width=0.7)
-    canvas.text(label.upper(), x + 22, LISTING_HEIGHT - y - 32, 17, "#B87C6E", font="sans")
-    canvas.text(body, x + 22, LISTING_HEIGHT - y - 68, 19, "#3D342D", font="serif")
-    slide.text_boxes.append((label, x + 22, y + 12, _text_width(label, 17, "sans"), 17, 17))
-
-
-def _compat_row(canvas: PdfCanvas, slide: CarouselSlide, title: str, body: str, x: float, y: float) -> None:
-    canvas.rect(x, LISTING_HEIGHT - y - 82, 420, 82, fill="#FFFDF8", stroke="#D7CABD", stroke_width=0.7)
-    canvas.text(title.upper(), x + 24, LISTING_HEIGHT - y - 30, 16, "#B87C6E", font="sans")
-    canvas.text(body, x + 24, LISTING_HEIGHT - y - 62, 24, "#3D342D", font="serif")
-    slide.text_boxes.append((body, x + 24, y + 36, _text_width(body, 24, "serif"), 24, 24))
-
-
-def _caption(canvas: PdfCanvas, slide: CarouselSlide, text: str, x: float, y: float, size: float) -> None:
-    canvas.text(text, x, LISTING_HEIGHT - y - size, size, "#76675B", font="sans")
-    slide.text_boxes.append((text, x, y, _text_width(text, size, "sans"), size, size))
-
-
-def _brand(canvas: PdfCanvas, slide: CarouselSlide, x: float, y: float) -> None:
-    canvas.text("atelier aurelia", x, LISTING_HEIGHT - y - 22, 22, "#6C5B4F", font="serif")
-    slide.text_boxes.append(("atelier aurelia", x, y, _text_width("atelier aurelia", 22, "serif"), 22, 22))
-
-
-def _write_slide_png(path: Path, slide: CarouselSlide, palette: Palette) -> None:
-    temp_pdf = path.with_suffix(".preview.pdf")
+def _write_slide_png(path: Path, slide: CarouselSlide, context: _CampaignContext, assets: CarouselAssets, palette: Palette) -> None:
+    html_text = slide.draw(context, assets, palette)
+    _record_slide_qa(slide, context, assets)
+    html_path = path.with_suffix(".html")
+    html_path.write_text(html_text, encoding="utf-8")
     try:
-        canvas = PngSlideCanvas(LISTING_WIDTH, LISTING_HEIGHT, palette.oat)
-        slide.draw(canvas, slide)
-        canvas.write(path)
-        return
-    except OSError:
-        pass
-
-    try:
-        canvas = PdfCanvas(LISTING_WIDTH, LISTING_HEIGHT)
-        slide.draw(canvas, slide)
-        canvas.write(temp_pdf)
-        if pdf_to_png(temp_pdf, path, width=LISTING_WIDTH, height=LISTING_HEIGHT):
-            return
-    except OSError:
-        pass
+        rendered = render_html_to_png(html_path, path, LISTING_WIDTH, LISTING_HEIGHT)
     finally:
         with suppress(FileNotFoundError):
-            temp_pdf.unlink()
-    _fallback_png(path, palette, slide.assets[:1])
+            html_path.unlink()
+    if not rendered:
+        _fallback_png(path, palette, slide.assets[:1])
+
+
+def _slide_page(class_name: str, body: str) -> str:
+    return f"""<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width={LISTING_WIDTH}, initial-scale=1">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=DM+Sans:wght@300;400;500&display=swap');
+    {_slide_base_css()}
+  </style>
+</head>
+<body>
+  <main class="slide {class_name}">
+    {body}
+    <div class="brand">atelier aurelia</div>
+  </main>
+</body>
+</html>
+"""
+
+
+def _slide_base_css() -> str:
+    return """
+:root {
+  --bg: #FAF7F4;
+  --paper: #FFFFFF;
+  --ink: #1E1A18;
+  --sub: #7A6E68;
+  --accent: #C4856A;
+  --accent-light: #F0DDD5;
+  --accent-2: #9BAF97;
+  --gold: #C9A96E;
+  --line: #EDE5DF;
+  --shadow: rgba(80, 50, 35, 0.12);
+  --visual-direction-hint: "premium digital planner";
+  --listing-visual-direction-hint: "warm editorial Etsy listing";
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; width: 2000px; height: 1600px; overflow: hidden; }
+body { background: var(--bg); color: var(--ink); font-family: 'DM Sans', sans-serif; }
+.slide { position: relative; width: 2000px; height: 1600px; overflow: hidden; background: radial-gradient(ellipse at 70% 30%, #F5EDE6 0%, var(--bg) 60%); }
+.slide::before { content: ""; position: absolute; inset: 32px; border: 1px solid var(--line); pointer-events: none; z-index: 30; }
+.brand { position: absolute; left: 80px; bottom: 68px; color: var(--gold); font: italic 300 34px 'Cormorant Garamond', serif; letter-spacing: -0.02em; }
+.kicker { margin: 0 0 28px; color: var(--accent); font: 500 18px 'DM Sans', sans-serif; letter-spacing: .18em; text-transform: uppercase; }
+h1 { margin: 0; color: var(--ink); font: 300 72px/1.05 'Cormorant Garamond', serif; letter-spacing: -0.02em; }
+.subhead { margin: 36px 0 0; color: var(--sub); font: 300 28px/1.6 'DM Sans', sans-serif; letter-spacing: 0; }
+.badge, .pill { display: inline-flex; align-items: center; justify-content: center; min-height: 58px; padding: 14px 32px; border-radius: 100px; border: 1px solid var(--accent); background: var(--accent-light); color: var(--accent); font: 500 20px 'DM Sans', sans-serif; letter-spacing: .10em; text-transform: uppercase; white-space: nowrap; }
+.badge-row { display: flex; flex-wrap: wrap; gap: 18px; margin-top: 48px; }
+img { display: block; }
+.ipad-frame { position: absolute; padding: 0; border-radius: 16px; background: var(--paper); box-shadow: 0 20px 60px var(--shadow); overflow: hidden; }
+.ipad-frame::after { content: none; }
+.ipad-frame img { width: 100%; height: 100%; object-fit: cover; object-position: top center; background: var(--paper); }
+.device-wrapper { position: relative; width: 520px; height: 700px; }
+.device-frame { position: absolute; inset: 0; background: #1C1C1E; border-radius: 36px; box-shadow: 0 0 0 2px #3A3A3C, 0 0 0 8px #2C2C2E, 0 40px 80px rgba(0,0,0,0.35); }
+.device-frame::before { content: ''; position: absolute; top: 14px; left: 50%; transform: translateX(-50%); width: 120px; height: 8px; background: #2C2C2E; border-radius: 4px; }
+.device-frame::after { content: ''; position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%); width: 80px; height: 4px; background: #3A3A3C; border-radius: 2px; }
+.device-screen { position: absolute; top: 34px; left: 16px; right: 16px; bottom: 28px; border-radius: 22px; overflow: hidden; background: #000; }
+.device-screen img { width: 100%; height: 100%; object-fit: cover; object-position: top center; display: block; }
+.overlap-card, .spread-thumb, .stack-thumb, .included-overview, .trans-tablet, .trans-stack, .compat-tablet, .detail-main { background: var(--paper); border-radius: 16px; box-shadow: 0 20px 60px var(--shadow); }
+.hero-copy { position: absolute; left: 0; top: 0; width: 860px; height: 1600px; padding: 100px 80px; z-index: 5; }
+.hero-copy h1 { font-size: 96px; max-width: 760px; }
+.hero-copy .subhead { max-width: 700px; }
+.hero-tagline { margin: 44px 0 0; color: var(--accent); font: italic 300 34px/1.35 'Cormorant Garamond', serif; letter-spacing: -0.02em; }
+.hero-visual { position: absolute; left: 860px; top: 0; width: 1140px; height: 1600px; }
+.hero-visual > .device-wrapper { position: absolute; left: 330px; top: 250px; transform: scale(1.45); transform-origin: top left; }
+.corner-line { position: absolute; right: 120px; top: 122px; width: 230px; height: 230px; border-top: 1px solid var(--gold); border-right: 1px solid var(--gold); opacity: .55; }
+.hero-ipad { left: 980px; top: 178px; width: 760px; height: 830px; }
+.hero-cover { position: absolute; left: 175px; top: 910px; width: 390px; height: 520px; object-fit: cover; object-position: top center; transform: rotate(-3deg); }
+.slide-heading { position: absolute; left: 92px; top: 88px; width: 1300px; z-index: 4; }
+.slide-heading h1 { font-size: 72px; }
+.slide-heading .subhead { max-width: 900px; }
+.interior-row { position: absolute; left: 92px; top: 500px; display: flex; gap: 44px; width: 1816px; overflow: hidden; }
+.spread-thumb { width: 565px; height: 400px; object-fit: cover; object-position: top center; }
+.interior-stack-row { position: absolute; left: 180px; top: 1010px; display: flex; gap: 88px; }
+.stack-thumb { width: 300px; height: 375px; object-fit: cover; object-position: top center; }
+.feature-title { position: absolute; left: 92px; top: 88px; width: 820px; z-index: 5; }
+.feature-title h1 { font-size: 72px; }
+.feature-ipad { left: 675px; top: 270px; width: 650px; height: 835px; }
+.feature-callout, .detail-callout { position: absolute; z-index: 5; width: 410px; padding: 30px 34px; border-radius: 16px; background: var(--paper); box-shadow: 0 20px 60px var(--shadow); }
+.feature-callout strong, .detail-callout strong { display: block; color: var(--ink); font: 300 38px/1.05 'Cormorant Garamond', serif; letter-spacing: -0.02em; }
+.feature-callout span, .detail-callout span { display: block; margin-top: 14px; color: var(--sub); font: 300 28px/1.35 'DM Sans', sans-serif; }
+.feature-callout.c1 { left: 116px; top: 410px; }
+.feature-callout.c2 { left: 116px; top: 720px; }
+.feature-callout.c3 { left: 1450px; top: 420px; }
+.feature-callout.c4 { left: 1450px; top: 735px; }
+.connector { position: absolute; height: 1px; background: var(--accent); transform-origin: left center; opacity: .72; }
+.connector::after { content: ""; position: absolute; right: -5px; top: -4px; width: 9px; height: 9px; border-radius: 50%; background: var(--accent); }
+.l1 { left: 526px; top: 540px; width: 180px; transform: rotate(-6deg); }
+.l2 { left: 526px; top: 852px; width: 180px; transform: rotate(-1deg); }
+.l3 { left: 1320px; top: 560px; width: 145px; transform: rotate(188deg); }
+.l4 { left: 1320px; top: 872px; width: 145px; transform: rotate(176deg); }
+.included-copy { position: absolute; left: 92px; top: 108px; width: 720px; z-index: 5; }
+.included-copy h1 { font-size: 72px; }
+.included-list { margin-top: 48px; display: grid; gap: 30px; }
+.included-row { display: grid; grid-template-columns: 80px 1fr; gap: 22px; align-items: start; }
+.included-row b { color: var(--gold); font: 300 54px/1 'Cormorant Garamond', serif; letter-spacing: -0.02em; }
+.included-row strong { display: block; color: var(--ink); font: 300 38px/1.05 'Cormorant Garamond', serif; letter-spacing: -0.02em; }
+.included-row span { display: block; margin-top: 8px; color: var(--sub); font: 300 26px/1.35 'DM Sans', sans-serif; }
+.included-overview { position: absolute; left: 890px; top: 175px; width: 900px; height: 650px; object-fit: cover; object-position: top center; }
+.bottom-strip { position: absolute; left: 500px; bottom: 142px; display: flex; gap: 50px; }
+.bottom-strip img { width: 190px; height: 230px; object-fit: cover; object-position: top center; border-radius: 16px; box-shadow: 0 20px 60px var(--shadow); background: var(--paper); }
+.transformation-slide { background: radial-gradient(ellipse at 70% 30%, #F5EDE6 0%, var(--bg) 60%); }
+.transformation-copy { position: absolute; left: 100px; top: 150px; width: 860px; z-index: 5; }
+.transformation-copy h1 { font-size: 82px; }
+.before-after { display: flex; gap: 22px; margin-top: 48px; }
+.before-after div { width: 350px; min-height: 150px; padding: 26px 30px; border-radius: 16px; background: var(--paper); box-shadow: 0 20px 60px var(--shadow); }
+.before-after strong { display: block; color: var(--accent); font: 500 18px 'DM Sans', sans-serif; letter-spacing: .18em; text-transform: uppercase; }
+.before-after span { display: block; margin-top: 14px; color: var(--ink); font: 300 28px/1.35 'DM Sans', sans-serif; }
+.trans-tablet { position: absolute; right: 170px; top: 210px; width: 760px; height: 570px; object-fit: cover; object-position: top center; }
+.trans-stack { position: absolute; right: 360px; top: 850px; width: 440px; height: 550px; object-fit: cover; object-position: top center; transform: rotate(-4deg); }
+.cover-heading { display: flex; align-items: center; gap: 30px; }
+.cover-heading h1 { width: 760px; }
+.cover-row { position: absolute; left: 130px; top: 500px; display: flex; gap: 45px; }
+.cover-row figure { margin: 0; width: 320px; }
+.cover-row img { width: 320px; height: 650px; object-fit: cover; object-position: top center; border-radius: 16px; background: var(--paper); box-shadow: 0 20px 60px var(--shadow); }
+.cover-row figcaption { margin-top: 24px; color: var(--sub); text-align: center; font: 500 20px 'DM Sans', sans-serif; letter-spacing: .10em; text-transform: uppercase; }
+.compatibility-slide > .device-wrapper { position: absolute; left: 235px; top: 205px; transform: scale(1.03); transform-origin: top left; }
+.compat-tablet { position: absolute; left: 145px; top: 235px; width: 850px; height: 630px; object-fit: cover; object-position: top center; }
+.compat-copy { position: absolute; right: 130px; top: 150px; width: 750px; }
+.compat-copy h1 { font-size: 72px; }
+.compat-list { display: grid; gap: 22px; margin-top: 54px; }
+.compat-row { display: grid; gap: 10px; padding: 26px 30px; border-radius: 16px; background: var(--paper); box-shadow: 0 20px 60px var(--shadow); }
+.compat-row strong { color: var(--accent); font: 500 18px 'DM Sans', sans-serif; letter-spacing: .18em; text-transform: uppercase; }
+.compat-row span { color: var(--ink); font: 300 34px/1.05 'Cormorant Garamond', serif; letter-spacing: -0.02em; }
+.detail-heading { position: absolute; left: 92px; top: 86px; width: 1100px; z-index: 5; }
+.detail-heading h1 { font-size: 72px; }
+.detail-main { position: absolute; left: 270px; top: 420px; width: 1360px; height: 820px; object-fit: cover; object-position: top center; }
+.detail-callout.d1 { left: 125px; top: 555px; }
+.detail-callout.d2 { right: 90px; top: 660px; }
+.detail-callout.d3 { left: 1350px; top: 1020px; }
+"""
+
+
+def _pill(value: str) -> str:
+    return f'<span class="pill">{_e(value)}</span>'
+
+
+def _callout_html(title: str, body: str, class_name: str) -> str:
+    return f'<div class="{class_name}"><strong>{_e(title)}</strong><span>{_e(body)}</span></div>'
+
+
+def _included_row_html(number: str, title: str, body: str) -> str:
+    return f'<div class="included-row"><b>{_e(number)}</b><div><strong>{_e(title)}</strong><span>{_e(body)}</span></div></div>'
+
+
+def _transformation_headline(context: _CampaignContext) -> str:
+    tagline = getattr(context.product_concept, "tagline", None) if context.product_concept else None
+    return str(tagline).strip() if tagline else "From scattered to structured."
+
+
+def _record_slide_qa(slide: CarouselSlide, context: _CampaignContext, assets: CarouselAssets) -> None:
+    slide.assets.clear()
+    slide.placements.clear()
+    slide.text_boxes.clear()
+
+    def image(asset: SourceAsset, x: float, y: float, width: float, height: float) -> None:
+        slide.assets.append(asset)
+        slide.placements.append((asset.path, x, y, width, height))
+
+    def text(value: str, x: float, y: float, width: float, height: float, size: float) -> None:
+        slide.text_boxes.append((value, x, y, width, height, size))
+
+    if slide.slide_type == "hero":
+        image(assets.tablets[0], 980, 178, 760, 830)
+        image(assets.covers[0], 1450, 890, 360, 500)
+        text(context.product_name, 110, 260, 730, 150, 60)
+        text(_hero_tagline(context), 110, 445, 660, 80, 24)
+    elif slide.slide_type == "interior_preview":
+        text("Inside the planner", 110, 92, 760, 90, 70)
+        for index, asset in enumerate(_select_evenly(assets.spreads, min(3, len(assets.spreads)))):
+            image(asset, 110 + index * 600, 510, 560, 390)
+        for index, asset in enumerate(_select_evenly(assets.paper_stacks, min(4, len(assets.paper_stacks)))):
+            image(asset, 180 + index * 388, 1000, 300, 375)
+    elif slide.slide_type == "features":
+        image(assets.tablets[0], 685, 260, 630, 820)
+        text("Plan intentionally. Follow through beautifully.", 110, 95, 740, 140, 60)
+    elif slide.slide_type == "whats_included":
+        overview = assets.bundle_overviews[0] if assets.bundle_overviews else assets.paper_stacks[0]
+        image(overview, 900, 160, 900, 650)
+        text(f"{context.page_count or 52} premium planning pages", 110, 118, 690, 160, 68)
+        for index, asset in enumerate(_select_evenly(assets.paper_stacks, min(5, len(assets.paper_stacks)))):
+            image(asset, 510 + index * 240, 1225, 190, 230)
+    elif slide.slide_type == "transformation":
+        image(assets.tablets[2 if len(assets.tablets) > 2 else 0], 1070, 210, 760, 570)
+        image(assets.paper_stacks[3 if len(assets.paper_stacks) > 3 else 0], 1200, 850, 440, 550)
+        text(_transformation_headline(context), 118, 160, 820, 170, 74)
+    elif slide.slide_type == "cover_options":
+        text("Choose your cover style.", 110, 92, 760, 90, 70)
+        for index, asset in enumerate(assets.covers[:5]):
+            image(asset, 130 + index * 365, 510, 320, 650)
+    elif slide.slide_type == "compatibility":
+        image(assets.tablets[0], 145, 235, 850, 630)
+        text("Use it digitally or print your favorite pages.", 1160, 168, 690, 150, 60)
+    elif slide.slide_type == "detail_closeup":
+        image(assets.details[0], 270, 420, 1360, 820)
+        text("Elegant structure. Generous writing space.", 110, 90, 960, 140, 62)
 
 
 def _write_thumbnail(source: Path, output_path: Path) -> None:
-    image = read_png(source)
-    thumb = resize_to_fit(image, THUMBNAIL_WIDTH, THUMBNAIL_HEIGHT, (247, 241, 234))
-    write_png(thumb, output_path)
+    body = f'<img class="thumb-source" src="{_asset_uri(source)}" alt="">'
+    _render_html_png(
+        output_path,
+        THUMBNAIL_WIDTH,
+        THUMBNAIL_HEIGHT,
+        body,
+        ":root{--bg:#FAF7F4;--paper:#FFFFFF;--ink:#1E1A18;--sub:#7A6E68;--accent:#C4856A;--accent-light:#F0DDD5;--accent-2:#9BAF97;--gold:#C9A96E;--line:#EDE5DF;--shadow:rgba(80,50,35,0.12);}body{background:radial-gradient(ellipse at 70% 30%,#F5EDE6 0%,var(--bg) 60%);}.thumb-source{width:100%;height:100%;object-fit:cover;object-position:top center;background:var(--paper);display:block;}",
+    )
 
 
 def _write_contact_sheet(image_paths: Sequence[Path], output_path: Path, title: str, columns: int, thumb_width: int, thumb_height: int) -> Path:
@@ -611,53 +705,52 @@ def _write_contact_sheet(image_paths: Sequence[Path], output_path: Path, title: 
     rows = max(1, math.ceil(len(image_paths) / columns))
     width = margin * 2 + columns * thumb_width + (columns - 1) * gutter
     height = margin * 2 + header_height + rows * (thumb_height + label_height) + (rows - 1) * gutter
-    canvas = Bitmap.solid(width, height, (242, 236, 228))
-    canvas.rect(0, 0, width, 18, (184, 124, 110))
-    canvas.text(title, margin, 34, 18, (67, 58, 50))
-    for index, image_path in enumerate(image_paths):
-        image = read_png(image_path)
-        thumb = resize_to_fit(image, thumb_width, thumb_height, (255, 253, 248))
-        col = index % columns
-        row = index // columns
-        x = margin + col * (thumb_width + gutter)
-        y = margin + header_height + row * (thumb_height + label_height + gutter)
-        canvas.rect(x + 8, y + 10, thumb_width, thumb_height, (202, 190, 176))
-        canvas.paste(thumb, x, y)
-        canvas.text(f"{index + 1:02d} {image_path.stem[:34]}", x, y + thumb_height + 16, 9, (106, 94, 82))
-    write_png(canvas, output_path)
+    figures = []
+    for index, image_path in enumerate(image_paths, start=1):
+        figures.append(
+            f"""
+<figure>
+  <img src="{_asset_uri(image_path)}" alt="">
+  <figcaption>{index:02d} {_e(image_path.stem[:34])}</figcaption>
+</figure>
+"""
+        )
+    body = f"""
+<div class="sheet" style="--columns:{columns};--thumb-w:{thumb_width}px;--thumb-h:{thumb_height}px;--gutter:{gutter}px;--margin:{margin}px">
+  <h1>{_e(title)}</h1>
+  <div class="grid">{"".join(figures)}</div>
+</div>
+"""
+    _render_html_png(output_path, width, height, body, _contact_sheet_css())
     return output_path
 
 
-def _write_listing_showroom(
-    listing_root: Path,
-    carousel_images: Sequence[Path],
-    thumbnails: Sequence[Path],
-    contact_sheet: Path,
-    thumbnail_sheet: Path,
-) -> None:
-    html = f"""<!doctype html>
+def _write_listing_showroom(listing_root: Path, carousel_images: Sequence[Path], thumbnails: Sequence[Path], contact_sheet: Path, thumbnail_sheet: Path) -> None:
+    html_text = f"""<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Etsy Listing Asset Showroom</title>
   <style>
-    :root {{ --page:#f4eee7; --paper:#fffdf8; --ink:#2f2924; --smoke:#6f6258; --line:#d8cbbd; --accent:#b87c6e; }}
+    @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=DM+Sans:wght@300;400;500&display=swap');
+    :root {{ --bg:#FAF7F4; --paper:#FFFFFF; --ink:#1E1A18; --sub:#7A6E68; --accent:#C4856A; --accent-light:#F0DDD5; --accent-2:#9BAF97; --gold:#C9A96E; --line:#EDE5DF; --shadow:rgba(80,50,35,0.12); }}
     * {{ box-sizing:border-box; }}
-    body {{ margin:0; background:var(--page); color:var(--ink); font-family:Inter, Helvetica, Arial, sans-serif; }}
-    header {{ padding:48px clamp(22px,5vw,72px) 28px; border-bottom:1px solid var(--line); background:var(--paper); }}
-    h1, h2 {{ margin:0; font-family:Georgia, 'Times New Roman', serif; font-weight:400; letter-spacing:0; }}
-    h1 {{ font-size:clamp(44px,6vw,84px); line-height:.95; max-width:900px; }}
-    p {{ color:var(--smoke); max-width:760px; line-height:1.5; }}
+    body {{ margin:0; background:radial-gradient(ellipse at 70% 30%,#F5EDE6 0%,var(--bg) 60%); color:var(--ink); font-family:'DM Sans', sans-serif; font-weight:300; }}
+    header {{ padding:58px clamp(22px,5vw,72px) 36px; border-bottom:1px solid var(--line); background:rgba(255,255,255,.72); }}
+    h1, h2 {{ margin:0; font-family:'Cormorant Garamond', serif; font-weight:300; letter-spacing:-0.02em; line-height:1.05; }}
+    h1 {{ font-size:clamp(56px,6vw,96px); max-width:980px; }}
+    h2 {{ font-size:clamp(42px,4vw,72px); }}
+    p {{ color:var(--sub); max-width:860px; font-size:22px; line-height:1.6; }}
     main {{ padding:34px clamp(18px,4vw,56px) 72px; }}
     section {{ margin:0 auto 42px; max-width:1580px; }}
     .rail {{ display:grid; grid-auto-flow:column; grid-auto-columns:minmax(520px,72vw); gap:22px; overflow-x:auto; padding:10px 2px 24px; scroll-snap-type:x mandatory; }}
-    figure {{ margin:0; background:var(--paper); border:1px solid var(--line); box-shadow:0 18px 42px rgba(69,52,38,.13); scroll-snap-align:start; }}
+    figure {{ margin:0; background:var(--paper); border-radius:16px; box-shadow:0 20px 60px var(--shadow); overflow:hidden; scroll-snap-align:start; }}
     img {{ display:block; width:100%; height:auto; }}
-    figcaption {{ padding:13px 15px 15px; color:var(--smoke); font-size:12px; letter-spacing:.08em; text-transform:uppercase; }}
+    figcaption {{ padding:18px 20px 20px; color:var(--accent); font:500 14px 'DM Sans', sans-serif; letter-spacing:.14em; text-transform:uppercase; }}
     .grid {{ display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:18px; }}
-    .sheet {{ display:grid; grid-template-columns:1fr; gap:20px; }}
-    @media (min-width:900px) {{ .sheet {{ grid-template-columns:1fr 1fr; }} }}
+    .sheet-grid {{ display:grid; grid-template-columns:1fr; gap:20px; }}
+    @media (min-width:900px) {{ .sheet-grid {{ grid-template-columns:1fr 1fr; }} }}
   </style>
 </head>
 <body>
@@ -666,23 +759,14 @@ def _write_listing_showroom(
     <p>High-converting listing assets built from the real generated planner mockups. Use this page to judge scroll impact, slide cohesion, and thumbnail readability before publishing.</p>
   </header>
   <main>
-    <section>
-      <h2>Full Carousel</h2>
-      <div class="rail">{_html_figures(listing_root, carousel_images, "Slide")}</div>
-    </section>
-    <section>
-      <h2>Mobile Thumbnail Read</h2>
-      <div class="grid">{_html_figures(listing_root, thumbnails, "Thumb")}</div>
-    </section>
-    <section>
-      <h2>Contact Sheets</h2>
-      <div class="sheet">{_html_figures(listing_root, [contact_sheet, thumbnail_sheet], "Sheet")}</div>
-    </section>
+    <section><h2>Full Carousel</h2><div class="rail">{_html_figures(listing_root, carousel_images, "Slide")}</div></section>
+    <section><h2>Mobile Thumbnail Read</h2><div class="grid">{_html_figures(listing_root, thumbnails, "Thumb")}</div></section>
+    <section><h2>Contact Sheets</h2><div class="sheet-grid">{_html_figures(listing_root, [contact_sheet, thumbnail_sheet], "Sheet")}</div></section>
   </main>
 </body>
 </html>
 """
-    (listing_root / "showroom.html").write_text(html, encoding="utf-8")
+    (listing_root / "showroom.html").write_text(html_text, encoding="utf-8")
 
 
 def _write_asset_manifest(
@@ -764,6 +848,99 @@ def _primary_mockup_readable(slide: CarouselSlide) -> bool:
     return any(w >= 520 and h >= 360 for _, _, _, w, h in slide.placements)
 
 
+def _fallback_png(path: Path, palette: Palette, assets: Sequence[SourceAsset]) -> None:
+    canvas = Bitmap.solid(LISTING_WIDTH, LISTING_HEIGHT, (250, 250, 248))
+    canvas.rect(0, 0, LISTING_WIDTH, 24, (201, 148, 138))
+    canvas.rect(96, 96, LISTING_WIDTH - 192, LISTING_HEIGHT - 192, (247, 243, 239))
+    canvas.text("HTML render fallback", 140, 150, 24, (42, 36, 32))
+    if assets:
+        canvas.text(_display_name(assets[0].path.stem), 140, 200, 14, (122, 110, 104))
+    write_png(canvas, path)
+
+
+def _render_html_png(output_path: Path, width: int, height: int, body: str, css: str) -> None:
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    html_path = output_path.with_suffix(".html")
+    html_path.write_text(_html_document(width, height, body, css), encoding="utf-8")
+    try:
+        from playwright.sync_api import sync_playwright
+    except ImportError as exc:
+        raise RuntimeError("Playwright is required for image rendering. Install with `pip install playwright` and run `playwright install chromium`.") from exc
+
+    with sync_playwright() as playwright:
+        browser = playwright.chromium.launch()
+        try:
+            page = browser.new_page(viewport={"width": width, "height": height}, device_scale_factor=1)
+            page.goto(html_path.resolve().as_uri(), wait_until="networkidle")
+            page.screenshot(path=str(output_path), full_page=False, animations="disabled")
+        finally:
+            browser.close()
+
+
+def _html_document(width: int, height: int, body: str, css: str) -> str:
+    return f"""<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width={width}, initial-scale=1">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=DM+Sans:wght@300;400;500&display=swap');
+    * {{ box-sizing: border-box; }}
+    html, body {{ margin: 0; padding: 0; width: {width}px; height: {height}px; overflow: hidden; }}
+    body {{ background: var(--bg, #FAF7F4); color: var(--ink, #1E1A18); font-family: 'DM Sans', sans-serif; font-weight: 300; }}
+    {css}
+  </style>
+</head>
+<body>{body}</body>
+</html>
+"""
+
+
+def _slide_css() -> str:
+    return """
+:root { --bg:#FAF7F4; --paper:#FFFFFF; --ink:#1E1A18; --sub:#7A6E68; --accent:#C4856A; --accent-light:#F0DDD5; --accent-2:#9BAF97; --gold:#C9A96E; --line:#EDE5DF; --shadow:rgba(80,50,35,0.12); }
+.slide { position: relative; width: 2000px; height: 1600px; overflow: hidden; background: radial-gradient(ellipse at 70% 30%, #F5EDE6 0%, var(--bg) 60%); }
+.slide::before { content: ""; position: absolute; inset: 32px; border: 1px solid var(--line); pointer-events: none; }
+.slide.cool { background: radial-gradient(ellipse at 70% 30%, #F5EDE6 0%, var(--bg) 60%); }
+.frame { position: absolute; inset: 32px; border: 1px solid var(--line); pointer-events: none; }
+.accent-band { position: absolute; right: 144px; top: 72px; width: 316px; height: 1456px; background: var(--accent-light); opacity: .62; }
+.accent-band::before { content: ""; position: absolute; left: -1420px; top: 48px; width: 1250px; height: 1px; background: var(--gold); box-shadow: 0 1358px 0 var(--gold); }
+.text, .badge, .callout, .included-row, .compat-row, .brand { position: absolute; z-index: 3; }
+.display { font-family: 'Cormorant Garamond', serif; font-weight: 300; line-height: 1.05; letter-spacing: -0.02em; }
+.copy { font-family: 'DM Sans', sans-serif; font-weight: 300; line-height: 1.6; letter-spacing: 0; }
+.badge { min-height: 58px; padding: 14px 32px; background: var(--accent-light); border: 1px solid var(--accent); border-radius: 100px; color: var(--accent); font: 500 20px 'DM Sans', sans-serif; letter-spacing: .10em; text-transform: uppercase; }
+.mockup, .hero-mockup, .cover-pop, .paper-pop, .spread-card, .paper-card, .detail-card, .mini-paper { position: absolute; z-index: 2; object-fit: cover; object-position: top center; background: var(--paper); border-radius: 16px; box-shadow: 0 20px 60px var(--shadow); transform-origin: 50% 50%; }
+.hero-mockup { box-shadow: 0 20px 60px var(--shadow); }
+.detail-card { object-fit: cover; background: var(--paper); }
+.callout { padding: 30px 34px; background: var(--paper); border-radius: 16px; box-shadow: 0 20px 60px var(--shadow); }
+.callout strong { display: block; color: var(--ink); font: 300 38px/1.05 'Cormorant Garamond', serif; letter-spacing: -0.02em; }
+.callout span { display: block; margin-top: 14px; color: var(--sub); font: 300 28px/1.35 'DM Sans', sans-serif; }
+.included-row { width: 560px; height: 82px; }
+.included-row b { display: inline-block; width: 72px; color: var(--gold); font: 300 54px/1 'Cormorant Garamond', serif; }
+.included-row strong { color: var(--ink); font: 300 38px/1.05 'Cormorant Garamond', serif; }
+.included-row span { display: block; margin-left: 92px; margin-top: 8px; color: var(--sub); font: 300 26px/1.35 'DM Sans', sans-serif; }
+.compat-row { width: 420px; min-height: 110px; padding: 26px 30px; background: var(--paper); border-radius: 16px; box-shadow: 0 20px 60px var(--shadow); }
+.compat-row strong { display: block; color: var(--accent); font: 500 18px 'DM Sans', sans-serif; letter-spacing: .18em; text-transform: uppercase; }
+.compat-row span { display: block; margin-top: 10px; color: var(--ink); font: 300 34px/1.05 'Cormorant Garamond', serif; letter-spacing: -0.02em; }
+.brand { left: 112px; bottom: 112px; color: var(--gold); font: italic 300 34px 'Cormorant Garamond', serif; }
+"""
+
+
+def _contact_sheet_css() -> str:
+    return """
+:root { --bg:#FAF7F4; --paper:#FFFFFF; --ink:#1E1A18; --sub:#7A6E68; --accent:#C4856A; --accent-light:#F0DDD5; --accent-2:#9BAF97; --gold:#C9A96E; --line:#EDE5DF; --shadow:rgba(80,50,35,0.12); }
+.sheet { position: relative; width: 100%; height: 100%; padding: var(--margin); background: radial-gradient(ellipse at 70% 30%, #F5EDE6 0%, var(--bg) 60%); }
+.sheet::before { content: ""; position: absolute; inset: 32px; border: 1px solid var(--line); pointer-events: none; }
+h1 { margin: 0 0 42px; color: var(--ink); font: 300 56px/1.05 'Cormorant Garamond', serif; letter-spacing: -0.02em; }
+.grid { display: grid; grid-template-columns: repeat(var(--columns), var(--thumb-w)); gap: var(--gutter); }
+figure { margin: 0; width: var(--thumb-w); }
+figure img { display: block; width: var(--thumb-w); height: var(--thumb-h); object-fit: cover; object-position: top center; background: var(--paper); border-radius: 16px; box-shadow: 0 20px 60px var(--shadow); }
+figcaption { height: 44px; padding-top: 14px; color: var(--accent); font: 500 14px 'DM Sans', sans-serif; letter-spacing: .14em; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+"""
+
+
 def _not_blank(image: Bitmap) -> bool:
     sample_step = max(1, (image.width * image.height) // 9000)
     mins = [255, 255, 255]
@@ -778,11 +955,7 @@ def _not_blank(image: Bitmap) -> bool:
 
 
 def _resolve_product_manifest(output_dir: Path) -> Path | None:
-    candidates = [
-        output_dir / "manifest.json",
-        output_dir.parent / "products" / "manifest.json",
-        Path("output/products/manifest.json"),
-    ]
+    candidates = [output_dir / "manifest.json", output_dir.parent / "products" / "manifest.json", Path("output/products/manifest.json")]
     for candidate in candidates:
         if not candidate.exists():
             continue
@@ -832,25 +1005,8 @@ def _first_existing(paths: Iterable[Path]) -> Path | None:
     return None
 
 
-def _read_json(path: Path) -> dict:
-    return json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
-
-
-def _wrap_text(value: str, max_width: float, size: float, font: str) -> List[str]:
-    words = value.split()
-    lines: List[str] = []
-    current = ""
-    for word in words:
-        candidate = word if not current else f"{current} {word}"
-        if _text_width(candidate, size, font) <= max_width:
-            current = candidate
-        else:
-            if current:
-                lines.append(current)
-            current = word
-    if current:
-        lines.append(current)
-    return lines
+def _read_json(path: Path | None) -> dict:
+    return json.loads(path.read_text(encoding="utf-8")) if path and path.exists() else {}
 
 
 def _text_width(value: str, size: float, font: str) -> float:
@@ -860,7 +1016,9 @@ def _text_width(value: str, size: float, font: str) -> float:
     return (len(value) * factor - slim * 0.18 + wide * 0.18) * size
 
 
-def _select_evenly(values: Sequence[SourceAsset], count: int) -> List[SourceAsset]:
+def _select_evenly(values: Sequence, count: int) -> List:
+    if count <= 0:
+        return []
     if len(values) <= count:
         return list(values)
     return [values[round(index * (len(values) - 1) / (count - 1))] for index in range(count)]
@@ -926,18 +1084,9 @@ def _rel(base: Path, target: Path) -> str:
     return str(target.relative_to(base)).replace("\\", "/") if target.is_relative_to(base) else str(target)
 
 
-def _fallback_png(path: Path, palette: Palette, assets: Sequence[SourceAsset]) -> None:
-    canvas = PngCanvas(LISTING_WIDTH, LISTING_HEIGHT, _rgb(palette.oat))
-    canvas.rect(110, 110, LISTING_WIDTH - 220, LISTING_HEIGHT - 220, _rgb(palette.paper))
-    if assets:
-        image = read_png(assets[0].path)
-        thumb = resize_to_fit(image, 1000, 760, _rgb(palette.paper))
-        bitmap = Bitmap(LISTING_WIDTH, LISTING_HEIGHT, canvas._pixels)
-        bitmap.paste(thumb, 500, 420)
-        write_png(bitmap, path)
-        return
-    canvas.write(path)
+def _asset_uri(path: Path) -> str:
+    return html.escape(path.resolve().as_uri(), quote=True)
 
 
-def _rgb(color: str) -> RGB:
-    return hex_to_rgb(color)
+def _e(value: object) -> str:
+    return html.escape(str(value), quote=True)
