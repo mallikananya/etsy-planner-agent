@@ -269,13 +269,15 @@ def _hero_tagline(context: _CampaignContext) -> str:
 
 
 def _interior_preview(context: _CampaignContext, assets: CarouselAssets, palette: Palette) -> str:
-    spreads = "".join(f'<img class="spread-thumb" src="{_asset_uri(asset.path)}" alt="">' for asset in _select_evenly(assets.spreads, min(3, len(assets.spreads))))
-    stacks = "".join(f'<img class="stack-thumb" src="{_asset_uri(asset.path)}" alt="">' for asset in _select_evenly(assets.paper_stacks, min(4, len(assets.paper_stacks))))
+    spreads = "".join(
+        f'<figure class="spread-panel"><img src="{_asset_uri(asset.path)}" alt=""></figure>'
+        for asset in _select_evenly(assets.spreads, min(3, len(assets.spreads)))
+    )
     concept = context.product_concept
     brief = context.market_brief
     included_titles = [str(value) for value in (getattr(concept, "included_page_titles", None) or context.page_titles or []) if str(value).strip()]
     preview_names = ", ".join(included_titles[:3])
-    product_name = str(getattr(concept, "product_name", None) or context.product_name or context.bundle.name)
+    product_name = _clean_name(str(getattr(concept, "product_name", None) or context.product_name or context.bundle.name), context.bundle.name)
     kicker = str(getattr(concept, "listing_angle", None) or getattr(brief, "name", None) or "Interior preview")
     subhead = f"Preview {preview_names.lower()} from {product_name} before purchase." if preview_names else f"Preview actual pages from {product_name} before purchase."
     return _slide_page(
@@ -286,8 +288,7 @@ def _interior_preview(context: _CampaignContext, assets: CarouselAssets, palette
   <h1>Inside {_e(product_name)}</h1>
   <p class="subhead">{_e(subhead)}</p>
 </section>
-<section class="interior-row">{spreads}</section>
-<section class="interior-stack-row">{stacks}</section>
+<section class="interior-rail">{spreads}</section>
 """,
     )
 
@@ -322,7 +323,12 @@ def _features(context: _CampaignContext, assets: CarouselAssets, palette: Palett
 {_callout_html(differentiators[1], bodies[1], "feature-callout c2")}
 {_callout_html(differentiators[2], bodies[2], "feature-callout c3")}
 {_callout_html(differentiators[3], bodies[3], "feature-callout c4")}
-<div class="connector l1"></div><div class="connector l2"></div><div class="connector l3"></div><div class="connector l4"></div>
+<svg class="feature-lines" viewBox="0 0 2000 1600" aria-hidden="true">
+  <line x1="520" y1="515" x2="760" y2="520" />
+  <line x1="520" y1="850" x2="760" y2="820" />
+  <line x1="1460" y1="520" x2="1240" y2="520" />
+  <line x1="1460" y1="850" x2="1240" y2="820" />
+</svg>
 """,
     )
 
@@ -331,7 +337,17 @@ def _included(context: _CampaignContext, assets: CarouselAssets, palette: Palett
     overview = assets.bundle_overviews[0] if assets.bundle_overviews else assets.paper_stacks[0]
     concept = context.product_concept
     brief = context.market_brief
-    included_titles = [str(value) for value in (getattr(concept, "included_page_titles", None) or context.page_titles or []) if str(value).strip()]
+    product_name = _clean_name(str(getattr(concept, "product_name", None) or context.product_name or context.bundle.name), context.bundle.name)
+    included_titles = [
+        str(value)
+        for value in (
+            getattr(context, "included_page_titles", None)
+            or getattr(concept, "included_page_titles", None)
+            or context.page_titles
+            or []
+        )
+        if str(value).strip()
+    ]
     for fallback in ["Complete PDF planner", "Printable pages", "Cover collection", "Instant delivery"]:
         if len(included_titles) >= 4:
             break
@@ -352,7 +368,7 @@ def _included(context: _CampaignContext, assets: CarouselAssets, palette: Palett
         f"""
 <section class="included-copy">
   <p class="kicker">{_e(str(getattr(concept, "listing_angle", None) or "What's included"))}</p>
-  <h1>{context.page_count or 52} pages inside {_e(str(getattr(concept, "product_name", None) or context.product_name or context.bundle.name))}</h1>
+  <h1>{context.page_count or 52} pages inside {_e(product_name)}</h1>
   <div class="included-list">{rows}</div>
 </section>
 <img class="included-overview" src="{_asset_uri(overview.path)}" alt="">
@@ -369,11 +385,12 @@ def _transformation(context: _CampaignContext, assets: CarouselAssets, palette: 
     hooks = [str(value) for value in (getattr(brief, "description_hooks", None) or []) if str(value).strip()]
     promise = str(getattr(concept, "promise", None) or "Your most productive year starts here.")
     body = " ".join(hooks[:2]) if hooks else f"A planning flow for {buyer_persona}, built around {promise.lower()}"
-    before = str(getattr(brief, "angle", None) or "Scattered notes, open tabs, and decisions living in your head")
-    after = str(getattr(concept, "promise", None) or "Clear priorities, calmer routines, and visible next steps")
+    before = "Scattered notes and open tabs"
+    after = "Calm routines and visible next steps"
     return _slide_page(
         "transformation-slide",
         f"""
+<img class="trans-bg" src="{_asset_uri(assets.paper_stacks[0].path)}" alt="">
 <section class="transformation-copy">
   <p class="kicker">{_e(str(getattr(concept, "listing_angle", None) or "The transformation"))}</p>
   <h1>{_e(headline)}</h1>
@@ -383,8 +400,6 @@ def _transformation(context: _CampaignContext, assets: CarouselAssets, palette: 
     <div><strong>After</strong><span>{_e(after)}</span></div>
   </div>
 </section>
-<img class="trans-tablet" src="{_asset_uri(assets.tablets[2 if len(assets.tablets) > 2 else 0].path)}" alt="">
-<img class="trans-stack" src="{_asset_uri(assets.paper_stacks[3 if len(assets.paper_stacks) > 3 else 0].path)}" alt="">
 """,
     )
 
@@ -392,13 +407,14 @@ def _transformation(context: _CampaignContext, assets: CarouselAssets, palette: 
 def _covers(context: _CampaignContext, assets: CarouselAssets, palette: Palette) -> str:
     concept = context.product_concept
     brief = context.market_brief
-    product_name = str(getattr(concept, "product_name", None) or context.product_name or context.bundle.name)
+    product_name = _clean_name(str(getattr(concept, "product_name", None) or context.product_name or context.bundle.name), context.bundle.name)
     cover_count = min(5, len(assets.covers))
     cards = []
     for index, asset in enumerate(assets.covers[:5]):
+        rotation = [-2, 1, 0, 2, -1][index]
         cards.append(
             f"""
-<figure>
+<figure style="--rotation:{rotation}deg">
   <img src="{_asset_uri(asset.path)}" alt="">
   <figcaption>{_e(_cover_label(asset, index))}</figcaption>
 </figure>
@@ -409,26 +425,26 @@ def _covers(context: _CampaignContext, assets: CarouselAssets, palette: Palette)
         f"""
 <section class="slide-heading cover-heading">
   <p class="kicker">{_e(str(getattr(concept, "listing_angle", None) or getattr(brief, "name", None) or "Cover options"))}</p>
-  <h1>Choose your {_e(product_name)} cover.</h1>
-  {_pill(f"{cover_count} cover styles")}
+  <h1>Choose your cover style.</h1>
 </section>
 <section class="cover-row">{"".join(cards)}</section>
+<div class="cover-badge">{_pill(f"{cover_count} cover styles")}</div>
 """,
     )
 
 
 def _compatibility(context: _CampaignContext, assets: CarouselAssets, palette: Palette) -> str:
     concept = context.product_concept
-    product_name = str(getattr(concept, "product_name", None) or context.product_name or context.bundle.name)
+    product_name = _clean_name(str(getattr(concept, "product_name", None) or context.product_name or context.bundle.name), context.bundle.name)
     screen_asset = assets.page_previews[0] if assets.page_previews else assets.tablets[0]
     rows = "".join(
-        f'<div class="compat-row"><strong>{_e(title)}</strong><span>{_e(body)}</span></div>'
-        for title, body in [
+        f'<div class="compat-row"><span class="compat-icon i{index}"></span><div><strong>{_e(title)}</strong><span>{_e(body)}</span></div></div>'
+        for index, (title, body) in enumerate([
             ("Digital PDF", "GoodNotes and PDF apps"),
             ("Printable", f"{context.page_count or 52} flexible pages"),
             ("Delivery", "Instant Etsy download"),
             ("Files", "Complete planner bundle"),
-        ]
+        ], start=1)
     )
     return _slide_page(
         "compatibility-slide",
@@ -464,12 +480,17 @@ def _detail(context: _CampaignContext, assets: CarouselAssets, palette: Palette)
         f"""
 <section class="detail-heading">
   <p class="kicker">{_e(str(getattr(concept, "listing_angle", None) or "Design details"))}</p>
-  <h1>{_e(product_name)} details for beautiful planning.</h1>
+  <h1>Details that make planning feel effortless.</h1>
 </section>
 <img class="detail-main" src="{_asset_uri(assets.details[0].path)}" alt="">
 {_callout_html(differentiators[0], promise, "detail-callout d1")}
 {_callout_html(differentiators[1], "Designed for daily use", "detail-callout d2")}
 {_callout_html(differentiators[2], "Clear writing space and easy scanning", "detail-callout d3")}
+<svg class="detail-lines" viewBox="0 0 2000 1600" aria-hidden="true">
+  <line x1="525" y1="590" x2="705" y2="650" />
+  <line x1="1480" y1="730" x2="1300" y2="760" />
+  <line x1="1500" y1="1110" x2="1300" y2="1020" />
+</svg>
 """,
     )
 
@@ -559,65 +580,82 @@ img { display: block; }
 .slide-heading { position: absolute; left: 92px; top: 88px; width: 1300px; z-index: 4; }
 .slide-heading h1 { font-size: 72px; }
 .slide-heading .subhead { max-width: 900px; }
-.interior-row { position: absolute; left: 92px; top: 500px; display: flex; gap: 44px; width: 1816px; overflow: hidden; }
+.interior-slide .slide-heading { left: 88px; top: 90px; width: 1760px; height: 470px; }
+.interior-slide .slide-heading h1 { font-size: 86px; max-width: 1280px; }
+.interior-slide .slide-heading .subhead { max-width: 1120px; }
+.interior-rail { position: absolute; left: 88px; right: 88px; top: 560px; height: 925px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 36px; }
+.spread-panel { margin: 0; height: 100%; border-radius: 16px; background: var(--paper); box-shadow: 0 20px 60px var(--shadow); overflow: hidden; }
+.spread-panel img { width: 100%; height: 100%; object-fit: cover; object-position: top center; }
 .spread-thumb { width: 565px; height: 400px; object-fit: cover; object-position: top center; }
-.interior-stack-row { position: absolute; left: 180px; top: 1010px; display: flex; gap: 88px; }
 .stack-thumb { width: 300px; height: 375px; object-fit: cover; object-position: top center; }
-.feature-title { position: absolute; left: 92px; top: 88px; width: 820px; z-index: 5; }
+.feature-title { position: absolute; left: 610px; top: 76px; width: 780px; z-index: 5; text-align: center; }
 .feature-title h1 { font-size: 72px; }
-.feature-ipad { left: 675px; top: 270px; width: 650px; height: 835px; }
+.feature-ipad { left: 700px; top: 360px; width: 600px; height: 780px; }
 .feature-callout, .detail-callout { position: absolute; z-index: 5; width: 410px; padding: 30px 34px; border-radius: 16px; background: var(--paper); box-shadow: 0 20px 60px var(--shadow); }
 .feature-callout strong, .detail-callout strong { display: block; color: var(--ink); font: 300 38px/1.05 'Cormorant Garamond', serif; letter-spacing: -0.02em; }
 .feature-callout span, .detail-callout span { display: block; margin-top: 14px; color: var(--sub); font: 300 28px/1.35 'DM Sans', sans-serif; }
-.feature-callout.c1 { left: 116px; top: 410px; }
-.feature-callout.c2 { left: 116px; top: 720px; }
-.feature-callout.c3 { left: 1450px; top: 420px; }
-.feature-callout.c4 { left: 1450px; top: 735px; }
+.feature-callout.c1 { left: 100px; top: 430px; }
+.feature-callout.c2 { left: 100px; top: 800px; }
+.feature-callout.c3 { left: 1490px; top: 430px; }
+.feature-callout.c4 { left: 1490px; top: 800px; }
+.feature-lines, .detail-lines { position: absolute; inset: 0; z-index: 4; pointer-events: none; }
+.feature-lines line, .detail-lines line { stroke: #C4856A; stroke-width: 1.5; stroke-dasharray: 4 4; }
 .connector { position: absolute; height: 1px; background: var(--accent); transform-origin: left center; opacity: .72; }
 .connector::after { content: ""; position: absolute; right: -5px; top: -4px; width: 9px; height: 9px; border-radius: 50%; background: var(--accent); }
 .l1 { left: 526px; top: 540px; width: 180px; transform: rotate(-6deg); }
 .l2 { left: 526px; top: 852px; width: 180px; transform: rotate(-1deg); }
 .l3 { left: 1320px; top: 560px; width: 145px; transform: rotate(188deg); }
 .l4 { left: 1320px; top: 872px; width: 145px; transform: rotate(176deg); }
-.included-copy { position: absolute; left: 92px; top: 108px; width: 720px; z-index: 5; }
+.included-copy { position: absolute; left: 100px; top: 108px; width: 780px; z-index: 5; }
 .included-copy h1 { font-size: 72px; }
 .included-list { margin-top: 48px; display: grid; gap: 30px; }
 .included-row { display: grid; grid-template-columns: 80px 1fr; gap: 22px; align-items: start; }
 .included-row b { color: var(--gold); font: 300 54px/1 'Cormorant Garamond', serif; letter-spacing: -0.02em; }
 .included-row strong { display: block; color: var(--ink); font: 300 38px/1.05 'Cormorant Garamond', serif; letter-spacing: -0.02em; }
 .included-row span { display: block; margin-top: 8px; color: var(--sub); font: 300 26px/1.35 'DM Sans', sans-serif; }
-.included-overview { position: absolute; left: 890px; top: 175px; width: 900px; height: 650px; object-fit: cover; object-position: top center; }
-.bottom-strip { position: absolute; left: 500px; bottom: 142px; display: flex; gap: 50px; }
-.bottom-strip img { width: 190px; height: 230px; object-fit: cover; object-position: top center; border-radius: 16px; box-shadow: 0 20px 60px var(--shadow); background: var(--paper); }
-.transformation-slide { background: radial-gradient(ellipse at 70% 30%, #F5EDE6 0%, var(--bg) 60%); }
-.transformation-copy { position: absolute; left: 100px; top: 150px; width: 860px; z-index: 5; }
-.transformation-copy h1 { font-size: 82px; }
-.before-after { display: flex; gap: 22px; margin-top: 48px; }
-.before-after div { width: 350px; min-height: 150px; padding: 26px 30px; border-radius: 16px; background: var(--paper); box-shadow: 0 20px 60px var(--shadow); }
+.included-overview { position: absolute; left: 1040px; top: 150px; width: 820px; height: 820px; object-fit: cover; object-position: top center; }
+.bottom-strip { position: absolute; left: 100px; right: 100px; bottom: 125px; display: flex; justify-content: center; gap: 34px; }
+.bottom-strip img { width: 250px; height: 180px; object-fit: cover; object-position: top center; border-radius: 16px; box-shadow: 0 20px 60px var(--shadow); background: var(--paper); }
+.transformation-slide { background: linear-gradient(135deg, #F0DDD5 0%, #FAF7F4 100%); }
+.trans-bg { position: absolute; left: 50%; top: 50%; width: 1280px; height: 980px; object-fit: cover; object-position: top center; opacity: .15; transform: translate(-50%, -50%) rotate(-4deg); border-radius: 16px; }
+.transformation-copy { position: absolute; left: 310px; top: 245px; width: 1380px; z-index: 5; text-align: center; }
+.transformation-copy h1 { margin: 0 auto; max-width: 1320px; font-size: 100px; }
+.transformation-copy .subhead { margin-left: auto; margin-right: auto; max-width: 980px; }
+.before-after { display: flex; justify-content: center; gap: 34px; margin-top: 64px; }
+.before-after div { width: 420px; min-height: 150px; padding: 26px 34px; border-radius: 100px; background: rgba(255,255,255,.82); box-shadow: 0 20px 60px var(--shadow); }
 .before-after strong { display: block; color: var(--accent); font: 500 18px 'DM Sans', sans-serif; letter-spacing: .18em; text-transform: uppercase; }
 .before-after span { display: block; margin-top: 14px; color: var(--ink); font: 300 28px/1.35 'DM Sans', sans-serif; }
 .trans-tablet { position: absolute; right: 170px; top: 210px; width: 760px; height: 570px; object-fit: cover; object-position: top center; }
 .trans-stack { position: absolute; right: 360px; top: 850px; width: 440px; height: 550px; object-fit: cover; object-position: top center; transform: rotate(-4deg); }
-.cover-heading { display: flex; align-items: center; gap: 30px; }
-.cover-heading h1 { width: 760px; }
-.cover-row { position: absolute; left: 130px; top: 500px; display: flex; gap: 45px; }
-.cover-row figure { margin: 0; width: 320px; }
-.cover-row img { width: 320px; height: 650px; object-fit: cover; object-position: top center; border-radius: 16px; background: var(--paper); box-shadow: 0 20px 60px var(--shadow); }
+.cover-heading { display: block; text-align: center; left: 260px; top: 105px; width: 1480px; }
+.cover-heading h1 { width: auto; font-size: 86px; }
+.cover-row { position: absolute; left: 170px; top: 535px; display: flex; gap: 70px; }
+.cover-row figure { margin: 0; width: 300px; transform: rotate(var(--rotation)); }
+.cover-row img { width: 300px; height: 400px; object-fit: cover; object-position: top center; border-radius: 16px; background: var(--paper); box-shadow: 0 20px 60px var(--shadow); }
 .cover-row figcaption { margin-top: 24px; color: var(--sub); text-align: center; font: 500 20px 'DM Sans', sans-serif; letter-spacing: .10em; text-transform: uppercase; }
-.compatibility-slide > .device-wrapper { position: absolute; left: 235px; top: 205px; transform: scale(1.03); transform-origin: top left; }
+.cover-badge { position: absolute; left: 0; right: 0; bottom: 190px; display: flex; justify-content: center; }
+.compatibility-slide > .device-wrapper { position: absolute; left: 250px; top: 265px; transform: scale(1.18); transform-origin: top left; }
 .compat-tablet { position: absolute; left: 145px; top: 235px; width: 850px; height: 630px; object-fit: cover; object-position: top center; }
-.compat-copy { position: absolute; right: 130px; top: 150px; width: 750px; }
-.compat-copy h1 { font-size: 72px; }
-.compat-list { display: grid; gap: 22px; margin-top: 54px; }
-.compat-row { display: grid; gap: 10px; padding: 26px 30px; border-radius: 16px; background: var(--paper); box-shadow: 0 20px 60px var(--shadow); }
+.compat-copy { position: absolute; left: 1100px; top: 120px; width: 800px; }
+.compat-copy h1 { font-size: 72px; max-width: 780px; }
+.compat-list { display: grid; gap: 22px; margin-top: 46px; }
+.compat-row { display: grid; grid-template-columns: 72px 1fr; gap: 20px; align-items: center; padding: 24px 28px; border-radius: 16px; background: var(--paper); box-shadow: 0 20px 60px var(--shadow); }
+.compat-icon { width: 54px; height: 54px; border-radius: 999px; background: var(--accent-light); position: relative; box-shadow: inset 0 0 0 1px var(--accent); }
+.compat-icon::before { content: ""; position: absolute; inset: 13px; border: 2px solid var(--accent); border-radius: 7px; }
+.compat-icon.i2::before { inset: 17px 12px 12px; border-radius: 2px; border-top-width: 7px; }
+.compat-icon.i3::before { inset: 12px 21px; border-radius: 999px; background: var(--accent); border: 0; transform: skew(-12deg); }
+.compat-icon.i4::before { inset: 17px 10px 12px; border-radius: 4px; border-top-left-radius: 12px; }
 .compat-row strong { color: var(--accent); font: 500 18px 'DM Sans', sans-serif; letter-spacing: .18em; text-transform: uppercase; }
 .compat-row span { color: var(--ink); font: 300 34px/1.05 'Cormorant Garamond', serif; letter-spacing: -0.02em; }
-.detail-heading { position: absolute; left: 92px; top: 86px; width: 1100px; z-index: 5; }
-.detail-heading h1 { font-size: 72px; }
-.detail-main { position: absolute; left: 270px; top: 420px; width: 1360px; height: 820px; object-fit: cover; object-position: top center; }
-.detail-callout.d1 { left: 125px; top: 555px; }
-.detail-callout.d2 { right: 90px; top: 660px; }
-.detail-callout.d3 { left: 1350px; top: 1020px; }
+.detail-heading { position: absolute; left: 92px; top: 92px; width: 520px; z-index: 5; }
+.detail-heading h1 { font-size: 64px; }
+.detail-main { position: absolute; left: 350px; top: 390px; width: 1300px; height: 820px; object-fit: cover; object-position: top center; }
+.detail-callout { width: 360px; padding: 24px 28px; }
+.detail-callout strong { font-size: 34px; }
+.detail-callout span { font-size: 24px; }
+.detail-callout.d1 { left: 105px; top: 520px; }
+.detail-callout.d2 { right: 95px; top: 640px; }
+.detail-callout.d3 { left: 1440px; top: 1020px; }
 """
 
 
