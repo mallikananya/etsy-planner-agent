@@ -1,7 +1,9 @@
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 from planner_generator.review import build_review_dashboard
+from planner_generator.review_showroom.pipeline import build_showroom
 
 
 PNG_BYTES = b"\x89PNG\r\n\x1a\n"
@@ -106,6 +108,61 @@ def test_review_dashboard_variation_manifest_uses_first_variation_with_note(tmp_
     assert "Second Variation Planner" not in html
     assert "Showing variation 1 of 2" in html
     assert "variation_manifest.json" in html
+
+
+def test_build_showroom_records_only_existing_focused_outputs(tmp_path):
+    output_dir = tmp_path / "default_output"
+    product_dir = output_dir / "products" / "planner"
+    carousel_dir = output_dir / "listing_assets" / "carousel"
+    tablet_dir = output_dir / "mockups" / "tablet"
+    stack_dir = output_dir / "mockups" / "paper_stacks"
+    listing_showroom = output_dir / "listing_assets" / "showroom.html"
+
+    carousel = _write_assets(carousel_dir, [f"{index:02d}_slide.png" for index in range(1, 9)])
+    page = _write_assets(product_dir / "pages", ["01_page.png"])[0]
+    _write_assets(tablet_dir, ["01_tablet.png"])
+    _write_assets(stack_dir, ["01_page_paper_stack.png"])
+    listing_showroom.write_text("<html>listing showroom</html>", encoding="utf-8")
+
+    product_manifest = product_dir / "product_manifest.json"
+    product_manifest.write_text(
+        json.dumps(
+            {
+                "product_name": "Soft Life Wellness Planner",
+                "theme_name": "Minimal Neutral",
+                "page_count": 1,
+                "individual_page_pngs": [str(page.relative_to(product_dir))],
+            }
+        ),
+        encoding="utf-8",
+    )
+    manifest = output_dir / "manifest.json"
+    manifest.write_text(
+        json.dumps(
+            {
+                "bundle_name": "Soft Life Wellness Planner",
+                "theme_name": "Minimal Neutral",
+                "product_manifest": str(product_manifest.relative_to(output_dir)),
+                "listing_image_files": [str(path.relative_to(output_dir)) for path in carousel],
+                "file_details": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    result = build_showroom(SimpleNamespace(output_dir=output_dir), tmp_path / "review")
+
+    updated_manifest = json.loads(manifest.read_text(encoding="utf-8"))
+    recorded_outputs = [Path(path) for path in result.output_files]
+    assert result.index_path.exists()
+    assert all(path.exists() for path in recorded_outputs)
+    assert not any("contact_sheet" in str(path) for path in recorded_outputs)
+    assert updated_manifest["showroom"] == str(result.index_path)
+    assert updated_manifest["generation_pipelines"]["review_showroom"]["outputs"] == [
+        "showroom.html",
+        "index.html",
+        "packaged showroom assets",
+    ]
 
 
 def _write_assets(directory: Path, names: list[str]) -> list[Path]:
