@@ -66,12 +66,16 @@ def _draw_page(
 def _draw_page_chrome(canvas: PdfCanvas, system: SoftLifeDesignSystem, width: float, height: float, margin: float, accent: str) -> None:
     p = system.palette
     canvas.rect(0, 0, width, height, fill=p.paper)
-    canvas.rect(0, height - 18, width, 18, fill=p.warm)
-    canvas.rect(0, 0, width, 18, fill=p.warm)
-    canvas.rect(width - margin * 0.68, 0, margin * 0.68, height, fill=p.warm)
+    canvas.rect(0, height - 28, width, 28, fill=p.warm)
+    canvas.rect(0, 0, width, 28, fill=p.warm)
+    canvas.line(margin, height - 36, width - margin, height - 36, p.clay, 0.6)
+    strip_width = margin * 0.35
+    strip_x = width - strip_width
+    canvas.rect(strip_x, 0, strip_width, height, fill=p.veil)
     canvas.line(margin, height - margin * 0.66, width - margin, height - margin * 0.66, p.hairline, system.dividers.hairline)
     canvas.line(margin, margin * 0.72, width - margin, margin * 0.72, p.hairline, system.dividers.hairline)
-    canvas.line(width - margin * 0.68, margin, width - margin * 0.68, height - margin, accent, system.dividers.fine)
+    canvas.line(strip_x, margin, strip_x, height - margin, accent, system.dividers.fine)
+    canvas.line(width - margin * 0.55, margin, width - margin * 0.55, height - margin, p.clay, 0.5)
 
 
 def _draw_header(canvas: PdfCanvas, page: PageSpec, system: SoftLifeDesignSystem, width: float, height: float, margin: float, profile) -> None:
@@ -81,11 +85,12 @@ def _draw_header(canvas: PdfCanvas, page: PageSpec, system: SoftLifeDesignSystem
     if system.brand_name:
         canvas.text(system.brand_name.upper(), margin, top - 10, system.type.micro, p.mist, font="sans")
     canvas.text(profile.rhythm.upper(), right - 90, top - 10, system.type.micro, profile.accent, font="sans")
-    canvas.text(page.title, margin, top - 55, _title_size(page.title, profile.title_size), p.ink, font="serif")
+    canvas.text(page.title, margin, top - 55, _title_size(page.title, profile.title_size + 3), p.ink, font="serif")
     if page.subtitle:
         canvas.text(_short(page.subtitle, 88), margin, top - 76, system.type.body, p.smoke, font="sans")
-    canvas.line(margin, top - 96, margin + 72, top - 96, profile.accent, system.dividers.accent)
-    canvas.line(margin + 82, top - 96, right - 24, top - 96, p.line, system.dividers.hairline)
+    canvas.rect(margin, top - 99, 4, 4, fill=p.clay)
+    canvas.line(margin, top - 96, margin + 96, top - 96, profile.accent, system.dividers.accent)
+    canvas.line(margin + 106, top - 96, right - 24, top - 96, p.line, system.dividers.hairline)
 
 
 def _draw_cover_page(canvas: PdfCanvas, page: PageSpec, system: SoftLifeDesignSystem, width: float, height: float, margin: float) -> None:

@@ -24,16 +24,16 @@ class ProductPalette:
 class TypeScale:
     cover: float = 64.0
     display: float = 42.0
-    title: float = 27.0
+    title: float = 30.0
     section: float = 10.0
-    body: float = 8.6
-    label: float = 6.8
+    body: float = 9.2
+    label: float = 7.2
     micro: float = 5.8
 
 
 @dataclass(frozen=True)
 class SpacingScale:
-    outer_margin_ratio: float = 0.082
+    outer_margin_ratio: float = 0.088
     header_gap: float = 18.0
     section_gap: float = 16.0
     small_gap: float = 8.0
