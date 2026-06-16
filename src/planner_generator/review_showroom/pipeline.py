@@ -22,8 +22,6 @@ def build_showroom(context: WorkflowContext, review_output: str | Path | None = 
     result = build_review_dashboard(manifest_path(context.output_dir), context.output_dir, output_dir)
     files = [
         result.index_path,
-        result.carousel_contact_sheet_path,
-        result.product_page_contact_sheet_path,
         *result.page_thumbnail_paths,
         *result.generated_mockup_paths,
     ]
@@ -41,7 +39,7 @@ def build_showroom(context: WorkflowContext, review_output: str | Path | None = 
 def _pipeline_manifest_update(manifest: dict) -> dict:
     pipelines = dict(manifest.get("generation_pipelines", {}))
     pipelines["review_showroom"] = {
-        "purpose": "Displays product files, mockups, listing images, copy, and export files in one local page.",
-        "outputs": ["showroom index.html"],
+        "purpose": "Displays the buyer-facing listing carousel, planner pages, selected mockups, and export files in one focused local page.",
+        "outputs": ["showroom.html", "index.html", "packaged showroom assets"],
     }
     return pipelines

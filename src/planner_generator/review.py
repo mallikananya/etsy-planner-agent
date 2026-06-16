@@ -117,7 +117,7 @@ def build_review_dashboard(
     bundle_output: str | Path | None = None,
     review_output: str | Path = REVIEW_DIR,
 ) -> ReviewResult:
-    manifest = _resolve_manifest(manifest_path, bundle_output)
+    manifest, variation_note = _resolve_showroom_manifest(manifest_path, bundle_output)
     bundle_dir = manifest.parent
     review_dir = Path(review_output)
     review_dir.mkdir(parents=True, exist_ok=True)
@@ -128,79 +128,62 @@ def build_review_dashboard(
     page_previews = _paths(product_dir, product_data.get("individual_page_pngs", []))
     if not page_previews:
         page_previews = _paths(bundle_dir, data.get("product_preview_files", []))
-    cover_images = _paths(product_dir, product_data.get("cover_pngs", []))
     primary_files = _paths(product_dir, product_data.get("primary_customer_files", [])) or _paths(bundle_dir, data.get("primary_customer_files", []))
     zip_file = _first_existing_path(product_dir, product_data.get("zip_file")) or _first_existing_path(bundle_dir, data.get("zip_file"))
-    listing_images = _paths(bundle_dir, data.get("listing_image_files", [])) or _discover_listing_images(bundle_dir)
-    listing_thumbnail_images = _discover_listing_thumbnails(bundle_dir, listing_images)
-    existing_mockups = _paths(bundle_dir, data.get("mockup_files", []))
-
-    reusable_mockups = _mockups_from_manifest(data, bundle_dir)
-    mockup_assets = reusable_mockups or _generate_showroom_mockups(review_dir, page_previews, cover_images, listing_images)
-    listing_images = listing_images or mockup_assets.carousel_panels
-    device_mockups = mockup_assets.device_mockups if reusable_mockups else [*existing_mockups, *mockup_assets.device_mockups]
-    generated_mockups = [] if reusable_mockups else [
-        *mockup_assets.page_mockups,
-        *mockup_assets.cover_mockups,
-        *device_mockups,
-        *mockup_assets.spreads,
-        *mockup_assets.bundle_overviews,
-        *mockup_assets.carousel_panels,
-        *mockup_assets.detail_mockups,
-    ]
+    listing_images = _showroom_listing_images(bundle_dir, data)
+    mockup_images = _showroom_mockup_images(bundle_dir, data)
+    listing_showroom = _listing_showroom_path(bundle_dir)
 
     carousel_sheet = review_dir / "assets" / "carousel_contact_sheet.png"
     product_sheet = review_dir / "assets" / "product_page_contact_sheet.png"
-    _write_contact_sheet(listing_images, carousel_sheet, "ETSY CAROUSEL REVIEW", columns=2, thumb_width=720, thumb_height=576)
-    _write_contact_sheet(mockup_assets.page_mockups, product_sheet, "PLANNER MOCKUP WALL", columns=5, thumb_width=250, thumb_height=312)
 
-    generated_at = datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds")
-    listing_copy = _listing_copy_data(bundle_dir)
     asset_map, asset_manifest, packaged_assets = _prepare_showroom_assets(
         review_dir,
         {
             "carousel": listing_images,
-            "mobile_thumbnails": listing_thumbnail_images,
             "product_pages": page_previews,
-            "page_mockups": mockup_assets.page_mockups,
-            "cover_images": cover_images,
-            "cover_mockups": mockup_assets.cover_mockups,
-            "device_mockups": device_mockups,
-            "spread_mockups": mockup_assets.spreads,
-            "detail_crops": mockup_assets.detail_mockups,
-            "bundle_overviews": mockup_assets.bundle_overviews,
-            "review_sheets": [carousel_sheet, product_sheet],
+            "mockups": mockup_images,
         },
     )
 
     html_text = _review_html(
         data=data,
         product_data=product_data,
-        bundle_dir=bundle_dir,
-        product_dir=product_dir,
         review_dir=review_dir,
-        generated_at=generated_at,
         listing_images=listing_images,
-        listing_thumbnail_images=listing_thumbnail_images,
         page_previews=page_previews,
-        page_mockups=mockup_assets.page_mockups,
-        cover_images=cover_images,
-        cover_mockups=mockup_assets.cover_mockups,
-        device_mockups=device_mockups,
-        spreads=mockup_assets.spreads,
-        bundle_overviews=mockup_assets.bundle_overviews,
-        detail_mockups=mockup_assets.detail_mockups,
+        mockup_images=mockup_images,
         primary_files=primary_files,
         zip_file=zip_file if zip_file and zip_file.exists() else None,
-        carousel_sheet=carousel_sheet,
-        product_sheet=product_sheet,
-        listing_copy=listing_copy,
+        listing_showroom=listing_showroom,
+        variation_note=variation_note,
         asset_map=asset_map,
     )
     showroom_path = review_dir / "showroom.html"
     showroom_path.write_text(html_text, encoding="utf-8")
     (review_dir / "index.html").write_text(html_text, encoding="utf-8")
-    return ReviewResult(showroom_path, carousel_sheet, product_sheet, [asset_manifest, *packaged_assets], generated_mockups)
+    return ReviewResult(showroom_path, carousel_sheet, product_sheet, [asset_manifest, *packaged_assets], [])
+
+
+def _resolve_showroom_manifest(manifest_path: str | Path | None, bundle_output: str | Path | None) -> tuple[Path, str]:
+    requested_manifest = _resolve_manifest(manifest_path, bundle_output)
+    if requested_manifest.name != "variation_manifest.json":
+        return requested_manifest, ""
+    data = json.loads(requested_manifest.read_text(encoding="utf-8"))
+    items = data.get("items", [])
+    if not isinstance(items, list) or not items:
+        raise FileNotFoundError(f"No variations found in {requested_manifest}")
+    first_item = items[0]
+    if not isinstance(first_item, dict) or not first_item.get("manifest"):
+        raise FileNotFoundError(f"First variation does not include a manifest path: {requested_manifest}")
+    first_manifest = Path(str(first_item["manifest"]))
+    if not first_manifest.is_absolute():
+        first_manifest = requested_manifest.parent / first_manifest
+    if not first_manifest.exists():
+        raise FileNotFoundError(f"First variation manifest not found: {first_manifest}")
+    count = int(data.get("variation_count") or len(items))
+    note = f"Showing variation 1 of {count} — open {requested_manifest} to compare all variations."
+    return first_manifest, note
 
 
 def _resolve_manifest(manifest_path: str | Path | None, bundle_output: str | Path | None) -> Path:
@@ -284,6 +267,71 @@ def _discover_listing_thumbnails(bundle_dir: Path, listing_images: Sequence[Path
             if images:
                 return images
     return list(listing_images)
+
+
+def _showroom_listing_images(bundle_dir: Path, data: dict) -> List[Path]:
+    candidates = [
+        bundle_dir / "listing_assets" / "carousel",
+        bundle_dir.parent / "listing_assets" / "carousel",
+        Path("output/listing_assets/carousel"),
+    ]
+    for directory in candidates:
+        if directory.exists():
+            images = _pngs_in(directory)
+            if images:
+                return images[:8]
+    return _paths(bundle_dir, data.get("listing_image_files", []))[:8]
+
+
+def _showroom_mockup_images(bundle_dir: Path, data: dict) -> List[Path]:
+    images: List[Path] = []
+    for directory in [
+        bundle_dir / "mockups" / "tablet",
+        bundle_dir.parent / "mockups" / "tablet",
+        Path("output/mockups/tablet"),
+    ]:
+        if directory.exists():
+            images.extend(_pngs_in(directory))
+            break
+    for directory in [
+        bundle_dir / "mockups" / "paper_stacks",
+        bundle_dir.parent / "mockups" / "paper_stacks",
+        Path("output/mockups/paper_stacks"),
+    ]:
+        if directory.exists():
+            images.extend(path for path in _pngs_in(directory) if path.name.endswith("_paper_stack.png"))
+            break
+    if images:
+        return images
+    return [
+        path
+        for path in _paths(bundle_dir, data.get("mockup_files", []))
+        if _is_showroom_mockup(path)
+    ]
+
+
+def _listing_showroom_path(bundle_dir: Path) -> Path | None:
+    for path in [
+        bundle_dir / "listing_assets" / "showroom.html",
+        bundle_dir.parent / "listing_assets" / "showroom.html",
+        Path("output/listing_assets/showroom.html"),
+    ]:
+        if path.exists():
+            return path
+    return None
+
+
+def _pngs_in(directory: Path) -> List[Path]:
+    return sorted(path for path in directory.glob("*.png") if path.is_file() and "contact_sheet" not in path.name)
+
+
+def _is_showroom_mockup(path: Path) -> bool:
+    normalized = str(path).replace(os.sep, "/")
+    if "/mockups/tablet/" in normalized:
+        return path.suffix.lower() == ".png"
+    if "/mockups/paper_stacks/" in normalized:
+        return path.name.endswith("_paper_stack.png")
+    return False
 
 
 def _prepare_showroom_assets(review_dir: Path, groups: Dict[str, Sequence[Path]]) -> tuple[Dict[str, Path], Path, List[Path]]:
@@ -753,251 +801,141 @@ def _review_html(
     *,
     data: dict,
     product_data: dict,
-    bundle_dir: Path,
-    product_dir: Path,
     review_dir: Path,
-    generated_at: str,
     listing_images: Sequence[Path],
-    listing_thumbnail_images: Sequence[Path],
     page_previews: Sequence[Path],
-    page_mockups: Sequence[Path],
-    cover_images: Sequence[Path],
-    cover_mockups: Sequence[Path],
-    device_mockups: Sequence[Path],
-    spreads: Sequence[Path],
-    bundle_overviews: Sequence[Path],
-    detail_mockups: Sequence[Path],
+    mockup_images: Sequence[Path],
     primary_files: Sequence[Path],
     zip_file: Path | None,
-    carousel_sheet: Path,
-    product_sheet: Path,
-    listing_copy: dict,
+    listing_showroom: Path | None,
+    variation_note: str,
     asset_map: Dict[str, Path],
 ) -> str:
-    all_product_files = list(primary_files) + ([zip_file] if zip_file else [])
     product_name = str(product_data.get("product_name") or data.get("bundle_name") or "Planner Review")
     page_count = int(product_data.get("page_count") or len(page_previews))
-    collection = str(listing_copy.get("collection_positioning", {}).get("collection_name", "Soft Life Series"))
-    category = str(listing_copy.get("collection_positioning", {}).get("category_name", "Planner Collection"))
     theme_name = str(product_data.get("theme_name") or data.get("theme_name") or data.get("theme_id") or "Editorial Planner System")
-    visual_language = [str(item) for item in product_data.get("visual_language", []) if str(item).strip()]
-    qa_items = _qa_summary(product_data, listing_images, listing_thumbnail_images, page_previews, cover_images, device_mockups, spreads, detail_mockups, all_product_files)
-    page_groups = _page_category_groups(product_data, page_previews)
-    section_dividers = _section_divider_paths(product_data, page_previews)
+    export_files = list(primary_files) + ([zip_file] if zip_file else [])
+    variation_html = f'<p class="variation-note">{_e(variation_note)}</p>' if variation_note else ""
     return f"""<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{_e(product_name)} Showroom</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
   <style>
     :root {{
-      --page: #f5eee5;
-      --paper: #fffdf8;
-      --ink: #2e2924;
-      --smoke: #685f56;
-      --mist: #9a8d80;
-      --line: #d9cbbd;
-      --accent: #b87c6e;
-      --shadow: rgba(66, 48, 36, 0.20);
-      --success: #557662;
-      --warning: #a77938;
-      --fail: #9b4e4b;
+      --bg: #FAF7F4;
+      --paper: #FFFDF8;
+      --ink: #2F2924;
+      --muted: #75695F;
+      --line: #E1D3C7;
+      --accent: #C4856A;
+      --shadow: rgba(67, 48, 35, 0.14);
     }}
     * {{ box-sizing: border-box; }}
-    html {{ scroll-behavior: smooth; }}
-    body {{ margin: 0; background: var(--page); color: var(--ink); font-family: Inter, Helvetica, Arial, sans-serif; line-height: 1.45; }}
+    body {{ margin: 0; background: var(--bg); color: var(--ink); font-family: 'DM Sans', sans-serif; }}
     a {{ color: inherit; }}
-    button {{ font: inherit; }}
-    .hero {{ min-height: 92vh; padding: 58px clamp(22px, 6vw, 86px) 42px; display: grid; grid-template-columns: minmax(0, 0.82fr) minmax(320px, 1fr); gap: clamp(28px, 5vw, 72px); align-items: center; background: linear-gradient(90deg, rgba(255,253,248,0.94), rgba(255,253,248,0.44)), var(--page); border-bottom: 1px solid var(--line); }}
-    .eyebrow {{ margin: 0 0 18px; color: var(--accent); font-size: 12px; letter-spacing: 0.16em; text-transform: uppercase; }}
-    h1, h2, h3 {{ font-family: Georgia, 'Times New Roman', serif; font-weight: 400; letter-spacing: 0; }}
-    h1 {{ margin: 0; font-size: clamp(46px, 7vw, 88px); line-height: 0.92; max-width: 780px; }}
-    .hero-copy p {{ max-width: 650px; color: var(--smoke); font-size: 17px; margin: 24px 0 0; }}
-    .meta-line {{ display: flex; flex-wrap: wrap; gap: 10px; margin: 26px 0 0; color: var(--smoke); }}
-    .meta-line span {{ border: 1px solid var(--line); background: rgba(255,253,248,0.68); padding: 8px 10px; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; }}
-    .hero-mockup {{ min-height: 560px; display: grid; align-items: center; }}
-    .hero-frame {{ position: relative; background: var(--paper); border: 1px solid var(--line); box-shadow: 0 34px 70px var(--shadow); padding: 18px; }}
-    .hero-frame img {{ width: 100%; display: block; }}
-    .hero-frame .caption {{ color: var(--mist); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; margin-top: 12px; }}
-    .stats {{ display: flex; flex-wrap: wrap; gap: 12px; margin-top: 34px; }}
-    .stat {{ min-width: 134px; padding: 16px 18px; background: rgba(255,253,248,0.72); border: 1px solid var(--line); }}
-    .stat strong {{ display: block; font-family: Georgia, 'Times New Roman', serif; font-size: 28px; font-weight: 400; }}
-    .stat span {{ color: var(--mist); font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; }}
-    .nav {{ position: sticky; top: 0; z-index: 20; display: flex; gap: 6px; overflow-x: auto; padding: 10px clamp(18px, 4vw, 52px); background: rgba(255,253,248,0.88); backdrop-filter: blur(18px); border-bottom: 1px solid var(--line); }}
-    .nav a {{ white-space: nowrap; text-decoration: none; color: var(--smoke); border: 1px solid transparent; padding: 8px 12px; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; }}
-    .nav a:hover {{ border-color: var(--line); background: var(--paper); }}
-    main {{ padding: 34px clamp(18px, 4vw, 52px) 80px; }}
-    section {{ margin: 0 auto 48px; max-width: 1540px; padding: clamp(26px, 4vw, 48px); background: rgba(255,253,248,0.64); border: 1px solid rgba(217,203,189,0.9); box-shadow: 0 22px 70px rgba(81, 62, 45, 0.08); }}
-    .section-head {{ display: flex; justify-content: space-between; gap: 24px; align-items: end; margin-bottom: 24px; border-bottom: 1px solid var(--line); padding-bottom: 18px; }}
-    .section-label {{ color: var(--accent); font-size: 12px; letter-spacing: 0.16em; text-transform: uppercase; }}
-    h2 {{ margin: 8px 0 0; font-size: clamp(30px, 4.2vw, 54px); line-height: 1; }}
-    .section-note {{ max-width: 420px; color: var(--smoke); font-size: 14px; }}
-    .qa-strip {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; margin: 0 0 28px; }}
-    .qa-card {{ background: var(--paper); border: 1px solid var(--line); padding: 16px; }}
-    .qa-card strong {{ display: block; font-family: Georgia, 'Times New Roman', serif; font-weight: 400; font-size: 20px; }}
-    .qa-card span {{ display: inline-block; margin: 0 0 10px; padding: 4px 7px; border-radius: 999px; color: #fff; font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; }}
-    .qa-card p {{ margin: 0; color: var(--smoke); font-size: 12px; }}
-    .qa-pass span {{ background: var(--success); }}
-    .qa-warning span {{ background: var(--warning); }}
-    .qa-fail span {{ background: var(--fail); }}
-    .rail {{ display: grid; grid-auto-flow: column; grid-auto-columns: minmax(300px, 34vw); gap: 22px; overflow-x: auto; padding: 10px 2px 24px; scroll-snap-type: x mandatory; }}
-    .rail.large {{ grid-auto-columns: minmax(560px, 68vw); }}
-    .gallery-card {{ margin: 0; background: var(--paper); border: 1px solid var(--line); box-shadow: 0 18px 34px rgba(69, 52, 38, 0.12); scroll-snap-align: start; }}
-    .image-button {{ display: block; width: 100%; padding: 0; border: 0; background: transparent; cursor: zoom-in; text-align: left; }}
-    .gallery-card img, .image-button img {{ width: 100%; height: auto; display: block; background: var(--paper); }}
-    .gallery-card figcaption {{ padding: 13px 14px 15px; color: var(--smoke); font-size: 12px; letter-spacing: 0.04em; text-transform: uppercase; }}
-    .ordered-gallery {{ counter-reset: slide; }}
-    .ordered-gallery .gallery-card figcaption::before {{ counter-increment: slide; content: counter(slide, decimal-leading-zero) " / "; color: var(--accent); }}
-    .thumbnail-grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-top: 18px; }}
-    .thumbnail-grid .gallery-card {{ box-shadow: 0 12px 24px rgba(69, 52, 38, 0.10); }}
-    .phone-row {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 16px; margin-top: 20px; }}
-    .phone-frame {{ background: #24211e; border-radius: 32px; padding: 12px; box-shadow: 0 18px 34px rgba(47,38,30,0.18); }}
-    .phone-frame img {{ width: 100%; border-radius: 22px; display: block; }}
-    .split-review {{ display: grid; grid-template-columns: minmax(0,1fr) minmax(0,0.88fr); gap: 22px; margin-top: 24px; }}
-    .side-stack {{ display: grid; gap: 14px; }}
-    .product-cover-strip {{ display: grid; grid-template-columns: minmax(260px, 0.34fr) minmax(0, 1fr); gap: 24px; align-items: start; margin: 0 0 28px; padding: 22px; background: rgba(255,253,248,0.74); border: 1px solid var(--line); box-shadow: 0 14px 34px rgba(69, 52, 38, 0.08); }}
-    .product-cover-strip h3 {{ margin: 0 0 8px; font-size: 30px; }}
-    .product-cover-strip .rail {{ padding-bottom: 10px; grid-auto-columns: minmax(220px, 260px); }}
-    .page-group {{ margin-top: 18px; }}
-    .page-group h3 {{ font-size: 28px; margin: 26px 0 12px; }}
-    .mini-grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; }}
-    .mini-grid .gallery-card figcaption {{ font-size: 10px; }}
-    .feature-grid {{ display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(320px, 0.95fr); gap: 26px; align-items: stretch; margin-bottom: 24px; }}
-    .feature-grid img {{ width: 100%; height: 100%; max-height: 820px; object-fit: contain; background: var(--paper); box-shadow: 0 28px 54px var(--shadow); }}
-    .approval-grid {{ display: grid; grid-template-columns: repeat(2, minmax(180px, 1fr)); gap: 14px; }}
-    .approval-card {{ background: var(--paper); border: 1px solid var(--line); padding: 18px; box-shadow: 0 12px 26px rgba(69, 52, 38, 0.08); }}
-    .approval-card strong {{ display: block; font-family: Georgia, 'Times New Roman', serif; font-size: 22px; font-weight: 400; margin-bottom: 6px; }}
-    .approval-card span {{ color: var(--smoke); font-size: 12px; }}
-    .compare-grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: 22px; margin-top: 26px; }}
-    .compare-card {{ background: var(--paper); border: 1px solid var(--line); padding: 16px; box-shadow: 0 18px 38px rgba(69, 52, 38, 0.10); }}
-    .compare-pair {{ display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items: center; }}
-    .compare-pair img {{ width: 100%; background: var(--paper); }}
-    .compare-labels {{ display: grid; grid-template-columns: 1fr 1fr; gap: 12px; color: var(--mist); font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; margin-bottom: 10px; }}
-    .export-grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }}
-    .export-card {{ display: block; text-decoration: none; background: var(--paper); border: 1px solid var(--line); padding: 18px; min-height: 106px; }}
-    .export-card strong {{ display: block; font-family: Georgia, 'Times New Roman', serif; font-weight: 400; font-size: 22px; margin-bottom: 8px; }}
-    .export-card span {{ display: block; color: var(--smoke); font-size: 12px; word-break: break-word; }}
-    .copy-grid {{ display: grid; grid-template-columns: minmax(0, 1.08fr) minmax(300px, 0.92fr); gap: 22px; align-items: start; }}
-    .copy-panel {{ background: var(--paper); border: 1px solid var(--line); padding: 20px; box-shadow: 0 14px 30px rgba(69, 52, 38, 0.08); }}
-    .copy-panel h3 {{ margin: 0 0 12px; font-size: 24px; line-height: 1.1; }}
-    .listing-title {{ font-family: Georgia, 'Times New Roman', serif; font-size: clamp(28px, 3vw, 42px); line-height: 1.06; margin-bottom: 16px; }}
-    .copy-body {{ white-space: pre-wrap; color: var(--smoke); font-size: 14px; }}
-    .tag-list, .copy-lines {{ display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }}
-    .tag-list span, .copy-lines span {{ border: 1px solid var(--line); background: rgba(245,238,229,0.62); color: var(--smoke); padding: 7px 9px; font-size: 12px; }}
-    .positioning-list {{ margin: 0; padding: 0; list-style: none; color: var(--smoke); font-size: 14px; }}
-    .positioning-list li {{ border-top: 1px solid var(--line); padding: 10px 0; }}
-    .positioning-list li:first-child {{ border-top: 0; padding-top: 0; }}
-    .asset-summary {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 20px; }}
-    .asset-summary div {{ background: var(--paper); border: 1px solid var(--line); padding: 14px; }}
-    .asset-summary strong {{ display: block; font-family: Georgia, 'Times New Roman', serif; font-size: 26px; font-weight: 400; }}
-    .lightbox {{ position: fixed; inset: 0; z-index: 60; display: none; align-items: center; justify-content: center; background: rgba(31,27,24,0.88); padding: 28px; }}
-    .lightbox.open {{ display: flex; }}
-    .lightbox-panel {{ width: min(96vw, 1500px); height: min(92vh, 980px); display: grid; grid-template-rows: auto 1fr; gap: 12px; }}
-    .lightbox-bar {{ display: flex; justify-content: space-between; gap: 12px; align-items: center; color: #fff; }}
-    .lightbox-controls {{ display: flex; gap: 8px; }}
-    .lightbox button {{ border: 1px solid rgba(255,255,255,0.34); color: #fff; background: rgba(255,255,255,0.08); padding: 8px 11px; cursor: pointer; }}
-    .lightbox-viewport {{ overflow: auto; background: rgba(255,253,248,0.08); border: 1px solid rgba(255,255,255,0.18); display: grid; place-items: center; }}
-    .lightbox img {{ max-width: 100%; transform-origin: center center; transition: transform 160ms ease; }}
-    .muted {{ color: var(--mist); }}
-    @media (max-width: 860px) {{ .hero, .feature-grid, .copy-grid, .split-review {{ grid-template-columns: 1fr; }} .hero-mockup {{ min-height: auto; }} section {{ padding: 24px 18px; }} .rail.large {{ grid-auto-columns: minmax(300px, 86vw); }} .compare-grid {{ grid-template-columns: 1fr; }} }}
+    header {{ padding: 56px clamp(22px, 6vw, 84px) 34px; border-bottom: 1px solid var(--line); background: linear-gradient(180deg, #FFFDF8 0%, var(--bg) 100%); }}
+    .eyebrow {{ margin: 0 0 12px; color: var(--accent); font-size: 12px; font-weight: 700; letter-spacing: .18em; text-transform: uppercase; }}
+    h1, h2 {{ font-family: 'Cormorant Garamond', serif; font-weight: 600; letter-spacing: 0; }}
+    h1 {{ margin: 0; font-size: clamp(48px, 7vw, 92px); line-height: .92; }}
+    .meta {{ display: flex; flex-wrap: wrap; gap: 10px; margin-top: 24px; color: var(--muted); }}
+    .meta span, .variation-note {{ border: 1px solid var(--line); background: rgba(255,253,248,.72); padding: 9px 12px; font-size: 12px; text-transform: uppercase; letter-spacing: .08em; }}
+    .variation-note {{ display: inline-block; margin: 22px 0 0; text-transform: none; letter-spacing: 0; }}
+    main {{ padding: 34px clamp(18px, 4vw, 56px) 80px; }}
+    section {{ max-width: 1500px; margin: 0 auto 44px; }}
+    .section-head {{ display: flex; justify-content: space-between; gap: 22px; align-items: end; margin-bottom: 18px; padding-bottom: 12px; border-bottom: 1px solid var(--line); }}
+    h2 {{ margin: 0; font-size: clamp(34px, 4vw, 56px); line-height: 1; }}
+    .section-head p {{ max-width: 430px; margin: 0; color: var(--muted); font-size: 14px; }}
+    .listing-rail {{ display: grid; grid-auto-flow: column; grid-auto-columns: 600px; gap: 22px; overflow-x: auto; padding: 6px 2px 24px; scroll-snap-type: x mandatory; }}
+    .page-grid, .mockup-grid {{ display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 18px; }}
+    figure {{ margin: 0; background: var(--paper); border: 1px solid var(--line); box-shadow: 0 18px 42px var(--shadow); }}
+    figure img {{ width: 100%; height: auto; display: block; background: var(--paper); }}
+    figcaption {{ padding: 11px 12px 13px; color: var(--muted); font-size: 12px; }}
+    .listing-rail figure {{ scroll-snap-align: start; }}
+    .listing-rail img {{ width: 600px; }}
+    .page-grid figure {{ max-width: 200px; justify-self: center; }}
+    .mockup-grid figure {{ max-width: 300px; justify-self: center; }}
+    .exports {{ margin: 0; padding: 0; list-style: none; display: grid; gap: 10px; }}
+    .exports li {{ display: flex; justify-content: space-between; gap: 16px; padding: 14px 16px; background: var(--paper); border: 1px solid var(--line); }}
+    .exports span {{ color: var(--muted); }}
+    @media (max-width: 940px) {{ .page-grid, .mockup-grid {{ grid-template-columns: repeat(2, minmax(0, 1fr)); }} .listing-rail {{ grid-auto-columns: minmax(300px, 86vw); }} .listing-rail img {{ width: 100%; }} }}
   </style>
 </head>
 <body>
-  <header class="hero">
-    <div class="hero-copy">
-      <p class="eyebrow">Section A / Hero Overview</p>
-      <h1>{_e(product_name)}</h1>
-      <p>{_e(collection)} · {_e(category)}. A single premium approval surface for judging whether the planner, storefront assets, copy, exports, and buyer-facing promise feel commercially cohesive before Etsy upload.</p>
-      <div class="meta-line"><span>{_e(theme_name)}</span><span>{_e(", ".join(visual_language[:2]) if visual_language else "soft luxury stationery")}</span><span>{_e(generated_at)}</span></div>
-      <div class="stats">
-        <div class="stat"><strong>{page_count}</strong><span>Planner Pages</span></div>
-        <div class="stat"><strong>{len(listing_images)}</strong><span>Carousel Slides</span></div>
-        <div class="stat"><strong>{len(cover_mockups or cover_images)}</strong><span>Cover Variants</span></div>
-        <div class="stat"><strong>{len(all_product_files)}</strong><span>Exports</span></div>
-      </div>
-    </div>
-    <div class="hero-mockup">{_hero_image(review_dir, listing_images, cover_mockups, page_mockups, asset_map)}</div>
+  <header>
+    <p class="eyebrow">Review Showroom</p>
+    <h1>{_e(product_name)}</h1>
+    <div class="meta"><span>{page_count} pages</span><span>{_e(theme_name)}</span><span>{len(listing_images)} carousel slides</span></div>
+    {variation_html}
   </header>
-  <nav class="nav">
-    <a href="#hero-review">Hero</a><a href="#carousel">Carousel</a><a href="#product">Product</a><a href="#mockups">Mockups</a><a href="#copy">Copy</a><a href="#exports">Exports</a>
-  </nav>
   <main>
-    <section id="hero-review">{_section_head("SECTION A", "Creative Direction Overview", "A concise read on the brand system, storefront promise, and readiness signals.")}
-      <div class="qa-strip">{_qa_cards(qa_items)}</div>
-      <div class="asset-summary">
-        <div><strong>{len(page_previews)}</strong><span>Actual page previews</span></div>
-        <div><strong>{len(spreads)}</strong><span>Rendered spreads</span></div>
-        <div><strong>{len(device_mockups)}</strong><span>Device mockups</span></div>
-        <div><strong>{len(detail_mockups)}</strong><span>Detail crops</span></div>
-      </div>
+    <section>
+      {_simple_section_head("YOUR ETSY LISTING", "The eight buyer-facing carousel slides, shown first in listing order.")}
+      <div class="listing-rail">{_simple_figures(review_dir, listing_images, "Carousel slide", asset_map)}</div>
     </section>
-    <section id="carousel">{_section_head("SECTION B", "Etsy Carousel Review", "Full carousel order, large preview, thumbnail strip, mobile simulation, and side-by-side cohesion checks.")}
-      {_carousel_review_html(review_dir, listing_images, listing_thumbnail_images, asset_map)}
+    <section>
+      {_simple_section_head("PLANNER PAGES", "Only the individual page PNGs from the product manifest.")}
+      <div class="page-grid">{_simple_figures(review_dir, page_previews, "Planner page", asset_map)}</div>
     </section>
-    <section id="product">{_section_head("SECTION C", "Actual Product Preview", "Rendered planner pages grouped by product structure, with spreads, section dividers, and cover system checks.")}
-      {_product_review_html(review_dir, page_groups, section_dividers, page_previews, cover_images, cover_mockups, spreads, asset_map)}
+    <section>
+      {_simple_section_head("MOCKUPS", "Only tablet mockups and paper stack mockups.")}
+      <div class="mockup-grid">{_simple_figures(review_dir, mockup_images, "Mockup", asset_map)}</div>
     </section>
-    <section id="mockups">{_section_head("SECTION D", "Mockup Review", "Tablet, paper stack, spread, detail crop, and lifestyle-style compositions presented as buyer-facing proof.")}
-      {_mockup_review_html(review_dir, cover_images, device_mockups, page_mockups, spreads, detail_mockups, bundle_overviews, asset_map)}
-    </section>
-    <section id="copy">{_section_head("SECTION E", "Copy Review", "Etsy title, description, tags, carousel marketing copy, and collection naming in one conversion-focused read.")}
-      {_copy_review_html(listing_copy)}
-    </section>
-    <section id="exports">{_section_head("SECTION F", "Exports + Deliverables", "Generated files, download links, output paths, and review sheets for final approval.")}
-      <div class="export-grid">{_export_cards(review_dir, all_product_files, product_data, product_dir, carousel_sheet, product_sheet)}</div>
-      <p class="muted">Showroom assets: output/review/showroom_assets · Source manifest: {_e(str(product_dir / "product_manifest.json"))}</p>
+    <section>
+      {_simple_section_head("EXPORT FILES", "Delivery files and the separate listing asset showroom.")}
+      <ul class="exports">{_simple_export_links(review_dir, export_files, listing_showroom)}</ul>
     </section>
   </main>
-  <div class="lightbox" id="lightbox" aria-hidden="true">
-    <div class="lightbox-panel">
-      <div class="lightbox-bar">
-        <span id="lightboxTitle">Image preview</span>
-        <div class="lightbox-controls">
-          <button type="button" data-zoom="out">Zoom -</button>
-          <button type="button" data-zoom="in">Zoom +</button>
-          <button type="button" data-close>Close</button>
-        </div>
-      </div>
-      <div class="lightbox-viewport"><img id="lightboxImage" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==" alt=""></div>
-    </div>
-  </div>
-  <script>
-    const lightbox = document.getElementById('lightbox');
-    const lightboxImage = document.getElementById('lightboxImage');
-    const lightboxTitle = document.getElementById('lightboxTitle');
-    let zoom = 1;
-    function openLightbox(src, title) {{
-      zoom = 1;
-      lightboxImage.src = src;
-      lightboxImage.style.transform = 'scale(1)';
-      lightboxTitle.textContent = title || 'Image preview';
-      lightbox.classList.add('open');
-      lightbox.setAttribute('aria-hidden', 'false');
-    }}
-    function closeLightbox() {{
-      lightbox.classList.remove('open');
-      lightbox.setAttribute('aria-hidden', 'true');
-      lightboxImage.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==';
-    }}
-    document.querySelectorAll('[data-lightbox-src]').forEach((button) => {{
-      button.addEventListener('click', () => openLightbox(button.dataset.lightboxSrc, button.dataset.lightboxTitle));
-    }});
-    document.querySelector('[data-close]').addEventListener('click', closeLightbox);
-    document.querySelector('[data-zoom="in"]').addEventListener('click', () => {{
-      zoom = Math.min(3, zoom + 0.25);
-      lightboxImage.style.transform = `scale(${{zoom}})`;
-    }});
-    document.querySelector('[data-zoom="out"]').addEventListener('click', () => {{
-      zoom = Math.max(0.5, zoom - 0.25);
-      lightboxImage.style.transform = `scale(${{zoom}})`;
-    }});
-    lightbox.addEventListener('click', (event) => {{ if (event.target === lightbox) closeLightbox(); }});
-    document.addEventListener('keydown', (event) => {{ if (event.key === 'Escape') closeLightbox(); }});
-  </script>
 </body>
 </html>
 """
+
+
+def _simple_section_head(title: str, note: str) -> str:
+    return f"""
+      <div class="section-head">
+        <h2>{_e(title)}</h2>
+        <p>{_e(note)}</p>
+      </div>
+    """
+
+
+def _simple_figures(review_dir: Path, paths: Sequence[Path], label: str, asset_map: Dict[str, Path]) -> str:
+    return "".join(
+        f"""
+        <figure>
+          <a href="{_href(review_dir, path, asset_map)}"><img src="{_href(review_dir, path, asset_map)}" alt="{_e(_display_name(path.stem))}" loading="lazy"></a>
+          <figcaption>{_e(label)} {index:02d} · {_e(path.name)}</figcaption>
+        </figure>
+        """
+        for index, path in enumerate(paths, start=1)
+    )
+
+
+def _simple_export_links(review_dir: Path, files: Sequence[Path], listing_showroom: Path | None) -> str:
+    links = [
+        f'<li><a href="{_href(review_dir, path)}">{_e(path.name)}</a><span>{_e(_file_size(path))}</span></li>'
+        for path in files
+        if path and path.exists()
+    ]
+    if listing_showroom and listing_showroom.exists():
+        links.append(
+            f'<li><a href="{_href(review_dir, listing_showroom)}" target="_blank" rel="noopener">Open listing_assets/showroom.html</a><span>{_e(str(listing_showroom))}</span></li>'
+        )
+    return "".join(links)
+
+
+def _file_size(path: Path) -> str:
+    size = path.stat().st_size
+    if size >= 1024 * 1024:
+        return f"{size / (1024 * 1024):.1f} MB"
+    if size >= 1024:
+        return f"{size / 1024:.1f} KB"
+    return f"{size} B"
 
 
 def _section_head(label: str, title: str, note: str) -> str:
