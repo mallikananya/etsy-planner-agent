@@ -22,8 +22,8 @@ class ProductPalette:
 
 @dataclass(frozen=True)
 class TypeScale:
-    cover: float = 48.0
-    display: float = 34.0
+    cover: float = 64.0
+    display: float = 42.0
     title: float = 27.0
     section: float = 10.0
     body: float = 8.6

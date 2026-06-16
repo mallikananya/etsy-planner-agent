@@ -90,16 +90,19 @@ def _draw_header(canvas: PdfCanvas, page: PageSpec, system: SoftLifeDesignSystem
 
 def _draw_cover_page(canvas: PdfCanvas, page: PageSpec, system: SoftLifeDesignSystem, width: float, height: float, margin: float) -> None:
     p = system.palette
+    kicker = str(page.metadata.get("kicker", "DIGITAL PLANNER"))
+    subtitle = page.subtitle or _subtitle_from_title(page.title)
+    tagline = str(page.metadata.get("tagline", ""))
     canvas.rect(margin * 1.08, margin * 1.12, width - margin * 2.48, height - margin * 2.24, fill=p.warm)
     canvas.rect(margin * 1.38, margin * 1.42, width - margin * 3.08, height - margin * 2.84, fill=p.paper, stroke=p.line, stroke_width=system.dividers.hairline)
     canvas.line(margin * 1.7, height - margin * 2.05, width - margin * 1.95, height - margin * 2.05, p.clay, system.dividers.accent)
-    canvas.text("PRINTABLE WELLNESS PLANNER", margin * 1.7, height - margin * 2.62, system.type.label, p.tea, font="sans")
-    canvas.text("Soft Life", margin * 1.7, height - margin * 3.6, system.type.cover, p.ink, font="serif")
-    canvas.text("Wellness Planner", margin * 1.7, height - margin * 4.36, system.type.display, p.ink, font="serif")
-    canvas.text(_short(page.subtitle or "", 78), margin * 1.72, height - margin * 5.02, system.type.body, p.smoke, font="sans")
+    canvas.text(kicker.upper(), margin * 1.7, height - margin * 2.62, system.type.label, p.tea, font="sans")
+    canvas.text(page.title, margin * 1.7, height - margin * 3.6, system.type.cover, p.ink, font="serif")
+    if subtitle:
+        canvas.text(_short(subtitle, 78), margin * 1.7, height - margin * 4.36, system.type.display, p.ink, font="serif")
     canvas.rect(margin * 1.72, margin * 2.1, width - margin * 4.1, 86, fill=p.veil)
-    canvas.text("routines / reflection / resets / gentle planning", margin * 2.05, margin * 3.12, system.type.label, p.smoke, font="sans")
-    canvas.text("A calmer way to hold the week.", margin * 2.05, margin * 2.66, 15, p.ink, font="serif")
+    if tagline:
+        canvas.text(_short(tagline, 78), margin * 2.05, margin * 3.12, system.type.label, p.smoke, font="sans")
 
 
 def _draw_divider_page(canvas: PdfCanvas, page: PageSpec, system: SoftLifeDesignSystem, width: float, height: float, margin: float, accent: str) -> None:
@@ -114,6 +117,13 @@ def _draw_divider_page(canvas: PdfCanvas, page: PageSpec, system: SoftLifeDesign
     canvas.line(margin * 1.72, height * 0.56 - 56, width - margin * 2.15, height * 0.56 - 56, accent, system.dividers.accent)
     canvas.text("section intention", margin * 1.72, margin * 2.34, system.type.label, p.tea, font="sans")
     canvas.line(margin * 1.72, margin * 2.05, width - margin * 2.15, margin * 2.05, p.line, system.dividers.hairline)
+
+
+def _subtitle_from_title(title: str) -> str:
+    words = title.split()
+    if len(words) <= 1:
+        return ""
+    return " ".join(words[1:])
 
 
 def _draw_footer(
