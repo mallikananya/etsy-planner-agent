@@ -60,7 +60,7 @@ def export_bundle(bundle_path: str | Path, theme: Theme, output_root: str | Path
     if output_dir.exists():
         shutil.rmtree(output_dir)
 
-    product_result = generate_planner_product_files(bundle, theme, pages, output_dir)
+    product_result = generate_planner_product_files(bundle, theme, pages, output_dir, product_concept=product_concept)
     generated_files: List[Path] = list(product_result.generated_files)
 
     listing_dir = output_dir / "listing"

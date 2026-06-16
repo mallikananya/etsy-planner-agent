@@ -63,7 +63,7 @@ class SoftLifeDesignSystem:
     type: TypeScale = TypeScale()
     spacing: SpacingScale = SpacingScale()
     dividers: DividerStyle = DividerStyle()
-    brand_name: str = "SOFT LIFE WELLNESS PLANNER"
+    brand_name: str = ""
 
     def page_profile(self, page_type: str, role: str = "") -> PageProfile:
         key = role or page_type
@@ -86,5 +86,5 @@ class SoftLifeDesignSystem:
         return PageProfile("balanced", 112.0, 16.0, 27.0, self.palette.tea, "balanced")
 
 
-def soft_life_system() -> SoftLifeDesignSystem:
-    return SoftLifeDesignSystem()
+def soft_life_system(brand_name: str = "") -> SoftLifeDesignSystem:
+    return SoftLifeDesignSystem(brand_name=brand_name)

@@ -18,18 +18,18 @@ class InteriorSection:
     bounds: Rect
 
 
-def render_page_to_pdf(page: PageSpec, theme: Theme, page_size_id: str, output_path: str | Path) -> None:
+def render_page_to_pdf(page: PageSpec, theme: Theme, page_size_id: str, output_path: str | Path, brand_name: str = "") -> None:
     page_size = get_page_size(page_size_id)
-    system = soft_life_system()
+    system = soft_life_system(brand_name=brand_name)
     canvas = PdfCanvas(width=page_size.width, height=page_size.height)
     _draw_page(canvas, page, system, page_size.width, page_size.height)
     canvas.write(output_path)
 
 
-def render_pages_to_pdf(pages: Iterable[PageSpec], theme: Theme, page_size_id: str, output_path: str | Path) -> None:
+def render_pages_to_pdf(pages: Iterable[PageSpec], theme: Theme, page_size_id: str, output_path: str | Path, brand_name: str = "") -> None:
     page_list = list(pages)
     page_size = get_page_size(page_size_id)
-    system = soft_life_system()
+    system = soft_life_system(brand_name=brand_name)
     canvas = PdfCanvas(width=page_size.width, height=page_size.height)
     for index, page in enumerate(page_list):
         if index:
@@ -78,7 +78,8 @@ def _draw_header(canvas: PdfCanvas, page: PageSpec, system: SoftLifeDesignSystem
     p = system.palette
     top = height - margin
     right = width - margin
-    canvas.text(system.brand_name, margin, top - 10, system.type.micro, p.mist, font="sans")
+    if system.brand_name:
+        canvas.text(system.brand_name.upper(), margin, top - 10, system.type.micro, p.mist, font="sans")
     canvas.text(profile.rhythm.upper(), right - 90, top - 10, system.type.micro, profile.accent, font="sans")
     canvas.text(page.title, margin, top - 55, _title_size(page.title, profile.title_size), p.ink, font="serif")
     if page.subtitle:
@@ -105,7 +106,8 @@ def _draw_divider_page(canvas: PdfCanvas, page: PageSpec, system: SoftLifeDesign
     p = system.palette
     canvas.rect(margin, margin, width - margin * 2.25, height - margin * 2, fill=p.warm)
     canvas.rect(margin * 1.3, margin * 1.32, width - margin * 3.05, height - margin * 2.64, fill=p.paper)
-    canvas.text(system.brand_name, margin * 1.7, height - margin * 2.05, system.type.micro, p.mist, font="sans")
+    if system.brand_name:
+        canvas.text(system.brand_name.upper(), margin * 1.7, height - margin * 2.05, system.type.micro, p.mist, font="sans")
     canvas.text(page.title, margin * 1.7, height * 0.56, system.type.display, p.ink, font="serif")
     if page.subtitle:
         canvas.text(_short(page.subtitle, 72), margin * 1.72, height * 0.56 - 30, system.type.body, p.smoke, font="sans")

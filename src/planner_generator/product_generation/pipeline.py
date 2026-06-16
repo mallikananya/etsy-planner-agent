@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import List
 
 from planner_generator.packaging.zipper import create_customer_zip
+from planner_generator.market_intelligence.models import ProductConcept
 from planner_generator.planner_specs.models import BundleSpec, PageSpec
 from planner_generator.product_generation.previews import write_product_page_previews
 from planner_generator.rendering.page_renderer import render_page_to_pdf, render_pages_to_pdf
@@ -20,7 +21,13 @@ class ProductGenerationResult:
     generated_files: List[Path]
 
 
-def generate_planner_product_files(bundle: BundleSpec, theme: Theme, pages: List[PageSpec], output_dir: str | Path) -> ProductGenerationResult:
+def generate_planner_product_files(
+    bundle: BundleSpec,
+    theme: Theme,
+    pages: List[PageSpec],
+    output_dir: str | Path,
+    product_concept: ProductConcept | None = None,
+) -> ProductGenerationResult:
     """Generate the actual customer-facing planner product.
 
     This pipeline owns functional outputs: printable PDFs, individual page PDFs,
@@ -32,18 +39,19 @@ def generate_planner_product_files(bundle: BundleSpec, theme: Theme, pages: List
     generated_files: List[Path] = []
     primary_customer_files: List[Path] = []
     individual_page_files: List[Path] = []
+    brand_name = _brand_name(bundle, product_concept)
 
     for size_id in bundle.paper_sizes:
         size_folder = _pdf_size_folder(size_id)
         combined_path = output_dir / "exports" / "pdf" / size_folder / f"{bundle.id}_{size_folder}_complete.pdf"
-        render_pages_to_pdf(pages, theme, size_id, combined_path)
+        render_pages_to_pdf(pages, theme, size_id, combined_path, brand_name=brand_name)
         generated_files.append(combined_path)
         primary_customer_files.append(combined_path)
 
         size_dir = output_dir / "exports" / "pdf" / size_folder
         for index, page in enumerate(pages, start=1):
             output_path = size_dir / f"{index:03d}_{page.id}.pdf"
-            render_page_to_pdf(page, theme, size_id, output_path)
+            render_page_to_pdf(page, theme, size_id, output_path, brand_name=brand_name)
             generated_files.append(output_path)
             individual_page_files.append(output_path)
 
@@ -66,3 +74,9 @@ def _pdf_size_folder(size_id: str) -> str:
     if size_id.lower() == "letter":
         return "us-letter"
     return size_id.lower()
+
+
+def _brand_name(bundle: BundleSpec, product_concept: ProductConcept | None) -> str:
+    if product_concept and product_concept.product_name:
+        return product_concept.product_name
+    return bundle.name

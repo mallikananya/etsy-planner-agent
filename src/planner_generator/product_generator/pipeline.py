@@ -113,19 +113,21 @@ def generate_product(context: WorkflowContext) -> ProductGeneratorResult:
 
 def _write_full_pdfs(context: WorkflowContext, inventory: ProductInventory, product_dir: Path) -> List[Path]:
     files: List[Path] = []
+    brand_name = _brand_name(context, inventory)
     for size_id in context.bundle.paper_sizes:
         folder = "us-letter" if size_id == "letter" else size_id
         path = product_dir / "pdf" / folder / f"{PRODUCT_SLUG}_{folder}_complete.pdf"
-        render_pages_to_pdf(inventory.pages, context.theme, size_id, path)
+        render_pages_to_pdf(inventory.pages, context.theme, size_id, path, brand_name=brand_name)
         files.append(path)
     return files
 
 
 def _write_individual_page_pdfs(context: WorkflowContext, inventory: ProductInventory, product_dir: Path) -> List[Path]:
     files: List[Path] = []
+    brand_name = _brand_name(context, inventory)
     for index, page in enumerate(inventory.pages, start=1):
         path = product_dir / "individual-pages" / "pdf" / f"{index:02d}_{page.id}.pdf"
-        render_page_to_pdf(page, context.theme, "letter", path)
+        render_page_to_pdf(page, context.theme, "letter", path, brand_name=brand_name)
         files.append(path)
     return files
 
@@ -334,3 +336,11 @@ def _reset_dirs(paths: Iterable[Path]) -> None:
         if path.exists():
             shutil.rmtree(path)
         path.mkdir(parents=True, exist_ok=True)
+
+
+def _brand_name(context: WorkflowContext, inventory: ProductInventory) -> str:
+    if context.product_concept.product_name:
+        return context.product_concept.product_name
+    if context.bundle.name:
+        return context.bundle.name
+    return inventory.product_name
