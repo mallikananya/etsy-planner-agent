@@ -854,6 +854,7 @@ def _review_html(
     .page-grid, .mockup-grid {{ display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 18px; }}
     figure {{ margin: 0; background: var(--paper); border: 1px solid var(--line); box-shadow: 0 18px 42px var(--shadow); }}
     figure img {{ width: 100%; height: auto; display: block; background: var(--paper); }}
+    .gallery-button {{ display: block; width: 100%; padding: 0; border: 0; background: transparent; cursor: zoom-in; text-align: left; }}
     figcaption {{ padding: 11px 12px 13px; color: var(--muted); font-size: 12px; }}
     .listing-rail figure {{ scroll-snap-align: start; }}
     .listing-rail img {{ width: 600px; }}
@@ -862,6 +863,14 @@ def _review_html(
     .exports {{ margin: 0; padding: 0; list-style: none; display: grid; gap: 10px; }}
     .exports li {{ display: flex; justify-content: space-between; gap: 16px; padding: 14px 16px; background: var(--paper); border: 1px solid var(--line); }}
     .exports span {{ color: var(--muted); }}
+    .lightbox {{ position: fixed; inset: 0; z-index: 50; display: none; align-items: center; justify-content: center; background: rgba(32, 26, 22, .88); padding: 28px 76px; }}
+    .lightbox.open {{ display: flex; }}
+    .lightbox img {{ max-width: min(1100px, 82vw); max-height: 84vh; object-fit: contain; background: var(--paper); box-shadow: 0 26px 80px rgba(0,0,0,.34); }}
+    .lightbox-close {{ position: absolute; top: 22px; right: 24px; border: 1px solid rgba(255,255,255,.36); background: rgba(255,255,255,.12); color: #fff; padding: 8px 12px; cursor: pointer; }}
+    .lightbox-arrow {{ position: absolute; top: 50%; transform: translateY(-50%); width: 48px; height: 72px; border: 1px solid rgba(255,255,255,.32); background: rgba(255,255,255,.14); color: #fff; font-size: 34px; line-height: 1; cursor: pointer; }}
+    .lightbox-prev {{ left: 18px; }}
+    .lightbox-next {{ right: 18px; }}
+    .lightbox-caption {{ position: absolute; left: 50%; bottom: 22px; transform: translateX(-50%); color: #fff; background: rgba(0,0,0,.22); padding: 7px 12px; font-size: 13px; }}
     @media (max-width: 940px) {{ .page-grid, .mockup-grid {{ grid-template-columns: repeat(2, minmax(0, 1fr)); }} .listing-rail {{ grid-auto-columns: minmax(300px, 86vw); }} .listing-rail img {{ width: 100%; }} }}
   </style>
 </head>
@@ -890,6 +899,62 @@ def _review_html(
       <ul class="exports">{_simple_export_links(review_dir, export_files, listing_showroom)}</ul>
     </section>
   </main>
+  <div class="lightbox" id="imageLightbox" aria-hidden="true">
+    <button type="button" class="lightbox-close" data-lightbox-close>Close</button>
+    <button type="button" class="lightbox-arrow lightbox-prev" data-lightbox-step="-1" aria-label="Previous image">‹</button>
+    <img id="lightboxImage" src="" alt="">
+    <button type="button" class="lightbox-arrow lightbox-next" data-lightbox-step="1" aria-label="Next image">›</button>
+    <div class="lightbox-caption" id="lightboxCaption"></div>
+  </div>
+  <script>
+    const galleryButtons = Array.from(document.querySelectorAll('[data-gallery-src]'));
+    const lightbox = document.getElementById('imageLightbox');
+    const lightboxImage = document.getElementById('lightboxImage');
+    const lightboxCaption = document.getElementById('lightboxCaption');
+    let currentIndex = 0;
+
+    function showImage(index) {{
+      if (!galleryButtons.length) return;
+      currentIndex = (index + galleryButtons.length) % galleryButtons.length;
+      const item = galleryButtons[currentIndex];
+      lightboxImage.src = item.dataset.gallerySrc;
+      lightboxImage.alt = item.dataset.galleryTitle || '';
+      lightboxCaption.textContent = `${{currentIndex + 1}} / ${{galleryButtons.length}} · ${{item.dataset.galleryTitle || ''}}`;
+    }}
+
+    function openLightbox(index) {{
+      showImage(index);
+      lightbox.classList.add('open');
+      lightbox.setAttribute('aria-hidden', 'false');
+    }}
+
+    function closeLightbox() {{
+      lightbox.classList.remove('open');
+      lightbox.setAttribute('aria-hidden', 'true');
+      lightboxImage.src = '';
+    }}
+
+    function stepLightbox(direction) {{
+      showImage(currentIndex + direction);
+    }}
+
+    galleryButtons.forEach((button, index) => {{
+      button.addEventListener('click', () => openLightbox(index));
+    }});
+    document.querySelectorAll('[data-lightbox-step]').forEach((button) => {{
+      button.addEventListener('click', () => stepLightbox(Number(button.dataset.lightboxStep)));
+    }});
+    document.querySelector('[data-lightbox-close]').addEventListener('click', closeLightbox);
+    lightbox.addEventListener('click', (event) => {{
+      if (event.target === lightbox) closeLightbox();
+    }});
+    document.addEventListener('keydown', (event) => {{
+      if (!lightbox.classList.contains('open')) return;
+      if (event.key === 'Escape') closeLightbox();
+      if (event.key === 'ArrowRight') showImage(currentIndex + 1);
+      if (event.key === 'ArrowLeft') showImage(currentIndex - 1);
+    }});
+  </script>
 </body>
 </html>
 """
@@ -908,7 +973,7 @@ def _simple_figures(review_dir: Path, paths: Sequence[Path], label: str, asset_m
     return "".join(
         f"""
         <figure>
-          <a href="{_href(review_dir, path, asset_map)}"><img src="{_href(review_dir, path, asset_map)}" alt="{_e(_display_name(path.stem))}" loading="lazy"></a>
+          <button type="button" class="gallery-button" data-gallery-src="{_href(review_dir, path, asset_map)}" data-gallery-title="{_e(label)} {index:02d} · {_e(path.name)}"><img src="{_href(review_dir, path, asset_map)}" alt="{_e(_display_name(path.stem))}" loading="lazy"></button>
           <figcaption>{_e(label)} {index:02d} · {_e(path.name)}</figcaption>
         </figure>
         """

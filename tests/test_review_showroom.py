@@ -68,8 +68,8 @@ def test_review_dashboard_shows_buyer_facing_sections_only(tmp_path):
     assert "52 pages" in html
     assert "Soft Neutral" in html
     assert html.index("YOUR ETSY LISTING") < html.index("PLANNER PAGES") < html.index("MOCKUPS") < html.index("EXPORT FILES")
-    assert html.count("Carousel slide") == 8
-    assert html.count("Planner page") == 5
+    assert html.count("<figcaption>Carousel slide") == 8
+    assert html.count("<figcaption>Planner page") == 5
     assert "01_tablet.png" in html
     assert "01_page_paper_stack.png" in html
     assert "bundle_overview_stack.png" not in html
@@ -163,6 +163,49 @@ def test_build_showroom_records_only_existing_focused_outputs(tmp_path):
         "index.html",
         "packaged showroom assets",
     ]
+
+
+def test_review_dashboard_image_viewer_has_click_through_arrows(tmp_path):
+    bundle_dir = tmp_path / "bundle"
+    product_dir = bundle_dir / "products" / "planner"
+    carousel = _write_assets(bundle_dir / "listing_assets" / "carousel", [f"{index:02d}_slide.png" for index in range(1, 3)])
+    page = _write_assets(product_dir / "pages", ["01_page.png"])[0]
+    mockup = _write_assets(bundle_dir / "mockups" / "tablet", ["01_tablet.png"])[0]
+    product_manifest = product_dir / "product_manifest.json"
+    product_manifest.write_text(
+        json.dumps(
+            {
+                "product_name": "Click Through Planner",
+                "theme_name": "Minimal Neutral",
+                "page_count": 1,
+                "individual_page_pngs": [str(page.relative_to(product_dir))],
+            }
+        ),
+        encoding="utf-8",
+    )
+    manifest = bundle_dir / "manifest.json"
+    manifest.write_text(
+        json.dumps(
+            {
+                "bundle_name": "Click Through Planner",
+                "theme_name": "Minimal Neutral",
+                "product_manifest": str(product_manifest.relative_to(bundle_dir)),
+                "listing_image_files": [str(path.relative_to(bundle_dir)) for path in carousel],
+                "mockup_files": [str(mockup.relative_to(bundle_dir))],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    result = build_review_dashboard(manifest, bundle_dir, tmp_path / "review")
+
+    html = result.index_path.read_text(encoding="utf-8")
+    assert 'data-gallery-src="' in html
+    assert 'class="lightbox-arrow lightbox-prev"' in html
+    assert 'class="lightbox-arrow lightbox-next"' in html
+    assert "showImage(currentIndex + direction)" in html
+    assert "ArrowRight" in html
+    assert "ArrowLeft" in html
 
 
 def _write_assets(directory: Path, names: list[str]) -> list[Path]:
